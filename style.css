@@ -83,9 +83,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .mini-slot.feriado { background-color: rgba(217, 119, 6, 0.15); border: 1px solid rgba(217, 119, 6, 0.4); color: var(--feriado); font-weight: 800; letter-spacing: 1px;}
 
 /* Cores Fortes (Tema Claro) */
-body.light-theme .mini-slot.active { background-color: rgba(15, 159, 110, 0.25); border: 1px solid rgba(15, 159, 110, 0.5); }
-body.light-theme .mini-slot.canceled { background-color: rgba(209, 73, 73, 0.25); border: 1px solid rgba(209, 73, 73, 0.5); }
-body.light-theme .mini-slot.feriado { background-color: rgba(217, 119, 6, 0.25); border: 1px solid rgba(217, 119, 6, 0.5); color: #b45309; }
+body.light-theme .mini-slot.active   { background-color: #bbf7d0; border: 1px solid #4ade80; }
+body.light-theme .mini-slot.canceled { background-color: #fecaca; border: 1px solid #f87171; }
+body.light-theme .mini-slot.feriado  { background-color: #fde68a; border: 1px solid #fbbf24; color: #92400e; }
 
 .mini-name{font-weight:700;color:var(--text);display:block;line-height:1.15;letter-spacing:0.1px;margin-bottom:2px;white-space:nowrap;overflow:hidden;font-size:13px;}
 body.light-theme .mini-name { color: #162033; font-weight: 800; }
