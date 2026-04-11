@@ -59,7 +59,7 @@ document.addEventListener('input', function(e) {
         const end = e.target.selectionEnd;
         let val = e.target.value;
 
-        if (e.target.id === 'allocObs' || e.target.id === 'newUnitInp' || e.target.id.startsWith('edit-u-')) {
+        if (e.target.id === 'allocObs' || e.target.id === 'newUnitInp' || e.target.id === 'newRoomInp' || e.target.id.startsWith('edit-u-') || e.target.id.startsWith('edit-r-')) {
             e.target.value = val.toUpperCase();
         } else {
             e.target.value = val.toLowerCase().replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); });
@@ -860,7 +860,7 @@ function editRoom(id) {
     `;
 }
 function saveRoomEdit(id) {
-    const val = document.getElementById(`edit-r-${id}`).value;
+    const val = document.getElementById(`edit-r-${id}`).value.toUpperCase();
     const unit = S.units.find(u => u.id === S.currentUnit);
     const room = unit.rooms.find(r => r.id === id);
     if(val && room) { room.name = val; saveConfig(); renderCfgBody('salas'); }
@@ -935,7 +935,7 @@ function saveDoctorEdit(id) {
 function addUnit(){ const v=document.getElementById('newUnitInp').value.toUpperCase(); if(!v)return; S.units.push({id:'u'+Date.now(), name:v, rooms:[]}); saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); }
 function deleteUnit(id){ if(!confirm("EXCLUIR UNIDADE?"))return; S.units=S.units.filter(u=>u.id!==id); if(S.currentUnit===id)S.currentUnit=S.units[0]?.id||null; saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); }
 
-function addRoom(){ const v=document.getElementById('newRoomInp').value; const unit=S.units.find(u=>u.id===S.currentUnit); if(!v||!unit)return; unit.rooms.push({id:'r'+Date.now(), name:v}); saveConfig(); renderCfgBody('salas'); }
+function addRoom(){ const v=document.getElementById('newRoomInp').value.toUpperCase(); const unit=S.units.find(u=>u.id===S.currentUnit); if(!v||!unit)return; unit.rooms.push({id:'r'+Date.now(), name:v}); saveConfig(); renderCfgBody('salas'); }
 function deleteRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; unit.rooms=unit.rooms.filter(r=>r.id!==id); saveConfig(); renderCfgBody('salas'); }
 
 function addDoctor(){
