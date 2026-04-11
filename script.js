@@ -248,7 +248,6 @@ function renderMain() {
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if(!unit) { el.innerHTML = "Unidade não encontrada."; return; }
-  const activeRooms = unit.rooms.filter(r => !r.archived);
 
   let dates = [];
   const isMonthView = S.view === 'month';
@@ -285,18 +284,18 @@ function renderMain() {
         <thead>
           <tr>
             <th style="width:50px"></th>
-            ${activeRooms.map((r,i) => `<th class="room-th room-color-${i%5}">${r.name}</th>`).join('')}
+            ${unit.rooms.map((r,i) => `<th class="room-th room-color-${i%5}" style="${r.archived ? 'opacity:0.45;text-decoration:line-through;' : ''}">${r.name}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
           ${['manha', 'tarde'].map(p => `
             <tr>
               <td class="side-label">${p === 'manha' ? 'MANHÃ' : 'TARDE'}</td>
-              ${activeRooms.map(r => {
+              ${unit.rooms.map(r => {
                 const key = `${unit.id}|${r.id}|${date}|${p}`;
                 const slot = S.slots[key];
                 return `
-                <td class="cell-slot" id="td-${key}" onclick="openAlloc('${key}')"
+                <td class="cell-slot${r.archived && !slot ? ' room-archived-empty' : ''}" id="td-${key}" onclick="openAlloc('${key}')"
                     ondragover="allowDrop(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${key}')">
                   ${slotHTML(slot, key, isMonthView)}
                 </td>`;
@@ -499,6 +498,10 @@ function applyMassClickToSlot(key) {
     const date = parts[2];
     const unit = S.units.find(u => u.id === unitId);
 
+    // Bloqueia novas alocações em sala arquivada (toggle só funciona se já existe slot)
+    const roomObj = unit?.rooms.find(r => r.id === parts[1]);
+    if (roomObj?.archived && !S.slots[key]) { showToast("SALA ARQUIVADA — SEM NOVAS ALOCAÇÕES"); return; }
+
     const massDoc = S.doctors.find(d => d.id === massDocId);
     const effectiveNature = (massDoc && massDoc.defaultNature) ? massDoc.defaultNature : massNature;
 
@@ -560,7 +563,12 @@ function openAlloc(key) {
 
   if(isMassMode) { applyMassClickToSlot(key); return; }
 
+  // Bloqueia novas alocações em salas arquivadas (mas permite editar slots existentes)
   const slot = S.slots[key];
+  const parts0 = key.split('|');
+  const unitObj = S.units.find(u => u.id === parts0[0]);
+  const roomObj = unitObj?.rooms.find(r => r.id === parts0[1]);
+  if (roomObj?.archived && !slot) { showToast("SALA ARQUIVADA — SEM NOVAS ALOCAÇÕES"); return; }
   document.getElementById('allocKey').value = key;
   document.getElementById('allocModal').classList.add('open');
 
