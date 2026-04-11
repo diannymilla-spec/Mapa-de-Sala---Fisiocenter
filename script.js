@@ -1,4 +1,8 @@
 // CONFIGURAÇÕES E ESTADO
+const SUPABASE_URL = 'https://rqmdufikdxfvridzrbcn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9E27fXvUfWzlY8jDosY8qg_omISB2JO';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const DAYS_PT=['DOMINGO','SEGUNDA-FEIRA','TERÇA-FEIRA','QUARTA-FEIRA','QUINTA-FEIRA','SEXTA-FEIRA','SÁBADO'];
 const MONTHS_PT=['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 
@@ -43,28 +47,121 @@ document.addEventListener('input', function(e) {
     }
 });
 
-function save(){ localStorage.setItem('mds_v5_pro_v20', JSON.stringify(S)); }
+// ── PERSISTÊNCIA ──
 
-function init() {
-  const saved = localStorage.getItem('mds_v5_pro_v20') || localStorage.getItem('mds_v5_pro_v19');
-  if(saved) {
-      S = JSON.parse(saved);
-      if (S.units && S.units.length > 0) {
-          S.doctors.forEach(d => { if (!d.unitId) d.unitId = S.units[0].id; });
-          S.units.forEach(u => {
-              u.name = u.name.toUpperCase();
-              u.rooms.forEach(r => {
-                  if (/^(consult\.|consultório|fisio)\s+\d+$/i.test(r.name)) {
-                      const num = r.name.match(/\d+/)[0];
-                      r.name = `SALA ${num}`;
-                  }
-              });
-          });
-      }
-  }
-  if(!S.weekAnchor) goToToday();
-  renderUnitSelect();
-  renderMain();
+// Estado de navegação/UI → localStorage (não precisa ir ao banco)
+function saveLocal() {
+    localStorage.setItem('mds_ui_state', JSON.stringify({
+        currentUnit: S.currentUnit,
+        view: S.view,
+        weekAnchor: S.weekAnchor,
+        monthYear: S.monthYear,
+        monthMonth: S.monthMonth,
+        theme: S.theme
+    }));
+}
+
+// Configurações (units + doctors) → Supabase mapa_config
+async function saveConfig() {
+    const { error } = await _supabase.from('mapa_config').upsert([
+        { id: 'units',   data: S.units },
+        { id: 'doctors', data: S.doctors }
+    ]);
+    if (error) { console.error('saveConfig:', error); showToast('ERRO AO SALVAR CONFIGURAÇÃO'); }
+}
+
+// Upsert de um único slot → Supabase mapa_slots
+async function upsertSlot(key, slotData) {
+    const { error } = await _supabase.from('mapa_slots').upsert({
+        slot_key:  key,
+        doctor_id: slotData.doctorId || null,
+        status:    slotData.status,
+        nature:    slotData.nature  || null,
+        obs:       slotData.obs     || ''
+    });
+    if (error) { console.error('upsertSlot:', error); showToast('ERRO AO SALVAR SLOT'); }
+}
+
+// Upsert de múltiplos slots de uma vez
+async function upsertSlots(slotsMap) {
+    const rows = Object.entries(slotsMap).map(([key, data]) => ({
+        slot_key:  key,
+        doctor_id: data.doctorId || null,
+        status:    data.status,
+        nature:    data.nature  || null,
+        obs:       data.obs     || ''
+    }));
+    if (!rows.length) return;
+    const { error } = await _supabase.from('mapa_slots').upsert(rows);
+    if (error) { console.error('upsertSlots:', error); showToast('ERRO AO SALVAR SLOTS'); }
+}
+
+// Remove um único slot
+async function removeSlot(key) {
+    const { error } = await _supabase.from('mapa_slots').delete().eq('slot_key', key);
+    if (error) { console.error('removeSlot:', error); showToast('ERRO AO REMOVER SLOT'); }
+}
+
+// Remove múltiplos slots de uma vez
+async function removeSlots(keys) {
+    if (!keys.length) return;
+    const { error } = await _supabase.from('mapa_slots').delete().in('slot_key', keys);
+    if (error) { console.error('removeSlots:', error); showToast('ERRO AO REMOVER SLOTS'); }
+}
+
+async function init() {
+    // 1. Carregar estado de UI do localStorage
+    const uiState = localStorage.getItem('mds_ui_state');
+    if (uiState) {
+        try {
+            const p = JSON.parse(uiState);
+            S.currentUnit = p.currentUnit || S.currentUnit;
+            S.view        = p.view        || S.view;
+            S.weekAnchor  = p.weekAnchor  || null;
+            S.monthYear   = p.monthYear   || S.monthYear;
+            S.monthMonth  = p.monthMonth  !== undefined ? p.monthMonth : S.monthMonth;
+            S.theme       = p.theme;
+        } catch(e) {}
+    }
+
+    // 2. Carregar configurações do Supabase
+    try {
+        const { data: configRows, error: cfgErr } = await _supabase.from('mapa_config').select('*');
+        if (!cfgErr && configRows && configRows.length > 0) {
+            const unitsRow   = configRows.find(r => r.id === 'units');
+            const doctorsRow = configRows.find(r => r.id === 'doctors');
+            if (unitsRow?.data)   S.units   = unitsRow.data;
+            if (doctorsRow?.data) S.doctors = doctorsRow.data;
+        }
+
+        // 3. Carregar slots do Supabase
+        const { data: slotRows, error: slotErr } = await _supabase.from('mapa_slots').select('*');
+        if (!slotErr && slotRows) {
+            S.slots = {};
+            slotRows.forEach(row => {
+                if (row.slot_key) {
+                    S.slots[row.slot_key] = {
+                        doctorId: row.doctor_id,
+                        status:   row.status,
+                        nature:   row.nature,
+                        obs:      row.obs || ''
+                    };
+                }
+            });
+        }
+    } catch(e) {
+        console.error('Erro ao carregar dados do Supabase:', e);
+    }
+
+    // 4. Aplicar tema salvo
+    if (S.theme === 'light') {
+        document.body.classList.remove('dark-theme');
+        document.body.classList.add('light-theme');
+    }
+
+    if(!S.weekAnchor) goToToday();
+    renderUnitSelect();
+    renderMain();
 }
 
 // SEGURANÇA E ARRASTAR
@@ -81,7 +178,7 @@ function goToToday() {
   const now = new Date();
   S.weekAnchor = fmt(monday(now));
   S.monthYear = now.getFullYear(); S.monthMonth = now.getMonth();
-  renderNavLabel(); renderMain(); save();
+  renderNavLabel(); renderMain(); saveLocal();
 }
 
 function navStep(dir) {
@@ -92,7 +189,7 @@ function navStep(dir) {
     if(S.monthMonth < 0){ S.monthMonth=11; S.monthYear--; }
     else if(S.monthMonth > 11){ S.monthMonth=0; S.monthYear++; }
   }
-  renderNavLabel(); renderMain(); save();
+  renderNavLabel(); renderMain(); saveLocal();
 }
 
 function renderNavLabel(){
@@ -109,7 +206,7 @@ function setView(v){
     if (isMassMode && v === 'week') {
         toggleMassMode();
     }
-    S.view=v; renderNavLabel(); renderMain(); save();
+    S.view=v; renderNavLabel(); renderMain(); saveLocal();
 }
 
 // RENDERIZAÇÃO
@@ -259,7 +356,12 @@ function handleDrop(e, targetKey) {
 
     S.slots[targetKey] = sourceData;
 
-    save(); renderMain(); showToast("HORÁRIO MOVIDO COM SUCESSO!");
+    // Persistir no Supabase
+    upsertSlot(targetKey, sourceData);
+    if(targetData) upsertSlot(sourceKey, targetData);
+    else removeSlot(sourceKey);
+
+    renderMain(); showToast("HORÁRIO MOVIDO COM SUCESSO!");
 }
 
 // TOGGLE HANDLER
@@ -322,7 +424,6 @@ function applyMassClickToSlot(key) {
     const parts = key.split('|');
     const unitId = parts[0];
     const date = parts[2];
-    const period = parts[3];
     const unit = S.units.find(u => u.id === unitId);
 
     if (massDiaInteiro) {
@@ -336,20 +437,25 @@ function applyMassClickToSlot(key) {
 
         if (anyFilled) {
             allKeys.forEach(k => { delete S.slots[k]; });
+            removeSlots(allKeys);
         } else {
             if (massStatus !== 'feriado' && !massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
+            const toAdd = {};
             allKeys.forEach(k => {
                 if (massStatus === 'feriado') {
                     S.slots[k] = { status: 'feriado', doctorId: null };
                 } else {
                     S.slots[k] = { doctorId: massDocId, status: massStatus, nature: massNature, obs: '' };
                 }
+                toAdd[k] = S.slots[k];
             });
+            upsertSlots(toAdd);
         }
     } else {
         const existing = S.slots[key];
         if (existing) {
             delete S.slots[key];
+            removeSlot(key);
         } else {
             if (massStatus === 'feriado') {
                 S.slots[key] = { status: 'feriado', doctorId: null };
@@ -357,10 +463,10 @@ function applyMassClickToSlot(key) {
                 if (!massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
                 S.slots[key] = { doctorId: massDocId, status: massStatus, nature: massNature, obs: '' };
             }
+            upsertSlot(key, S.slots[key]);
         }
     }
 
-    save();
     renderMain();
 }
 
@@ -399,77 +505,87 @@ function openAlloc(key) {
 function closeAlloc() { document.getElementById('allocModal').classList.remove('open'); }
 
 function saveAllocation() {
-  const key = document.getElementById('allocKey').value;
-  const docId = document.getElementById('allocDocId').value;
+  const key    = document.getElementById('allocKey').value;
+  const docId  = document.getElementById('allocDocId').value;
   const status = curTgl.tglAllocStatus;
-  const scope = curTgl.tglAllocScope;
+  const scope  = curTgl.tglAllocScope;
   const nature = curTgl.tglAllocNature;
-  const obs = document.getElementById('allocObs').value.trim();
+  const obs    = document.getElementById('allocObs').value.trim();
 
   if(!docId && status !== 'feriado') { showToast("SELECIONE UM MÉDICO!"); return; }
 
-  const unit = S.units.find(u => u.id === S.currentUnit);
+  const unit  = S.units.find(u => u.id === S.currentUnit);
   const parts = key.split('|');
-  const date = parts[2];
+  const date  = parts[2];
   const period = parts[3];
+
+  const toSave = {};
 
   if (status === 'feriado') {
       unit.rooms.forEach(room => {
-          S.slots[`${unit.id}|${room.id}|${date}|${period}`] = { status: 'feriado', doctorId: null };
+          const k1 = `${unit.id}|${room.id}|${date}|${period}`;
+          S.slots[k1] = { status: 'feriado', doctorId: null };
+          toSave[k1] = S.slots[k1];
           if (scope === 'diatodo') {
               const otherPeriod = period === 'manha' ? 'tarde' : 'manha';
-              S.slots[`${unit.id}|${room.id}|${date}|${otherPeriod}`] = { status: 'feriado', doctorId: null };
+              const k2 = `${unit.id}|${room.id}|${date}|${otherPeriod}`;
+              S.slots[k2] = { status: 'feriado', doctorId: null };
+              toSave[k2] = S.slots[k2];
           }
       });
       showToast(scope === 'diatodo' ? "DIA TODO MARCADO COMO FERIADO" : "TURNO MARCADO COMO FERIADO");
   } else {
       const apply = (k) => {
-          S.slots[k] = { doctorId: docId, status: status, nature: nature, obs: obs };
+          S.slots[k] = { doctorId: docId, status, nature, obs };
+          toSave[k] = S.slots[k];
       };
       apply(key);
       if(scope === 'diatodo') {
-          const otherKey = `${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`;
-          apply(otherKey);
+          apply(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
       }
       showToast("ALOCAÇÃO SALVA!");
   }
 
-  save(); closeAlloc(); renderMain();
+  upsertSlots(toSave);
+  closeAlloc(); renderMain();
 }
 
 function deleteAllocation() {
-    const key = document.getElementById('allocKey').value;
-    const scope = curTgl.tglAllocScope;
-    const slot = S.slots[key];
-
-    const parts = key.split('|');
+    const key    = document.getElementById('allocKey').value;
+    const scope  = curTgl.tglAllocScope;
+    const slot   = S.slots[key];
+    const parts  = key.split('|');
     const unitId = parts[0];
     const roomId = parts[1];
-    const date = parts[2];
+    const date   = parts[2];
     const period = parts[3];
 
     const unit = S.units.find(u => u.id === unitId);
-    const remove = (k) => { delete S.slots[k]; };
+    const keysToDelete = [];
 
     if (slot && slot.status === 'feriado') {
         unit.rooms.forEach(r => {
-            remove(`${unitId}|${r.id}|${date}|${period}`);
+            const k1 = `${unitId}|${r.id}|${date}|${period}`;
+            delete S.slots[k1]; keysToDelete.push(k1);
             if (scope === 'diatodo') {
                 const otherPeriod = period === 'manha' ? 'tarde' : 'manha';
-                remove(`${unitId}|${r.id}|${date}|${otherPeriod}`);
+                const k2 = `${unitId}|${r.id}|${date}|${otherPeriod}`;
+                delete S.slots[k2]; keysToDelete.push(k2);
             }
         });
         showToast(scope === 'diatodo' ? "FERIADO REMOVIDO DO DIA TODO" : "FERIADO REMOVIDO DO TURNO");
     } else {
-        remove(key);
+        delete S.slots[key]; keysToDelete.push(key);
         if (scope === 'diatodo') {
             const otherPeriod = period === 'manha' ? 'tarde' : 'manha';
-            remove(`${unitId}|${roomId}|${date}|${otherPeriod}`);
+            const k2 = `${unitId}|${roomId}|${date}|${otherPeriod}`;
+            delete S.slots[k2]; keysToDelete.push(k2);
         }
         showToast("ALOCAÇÃO REMOVIDA!");
     }
 
-    save(); closeAlloc(); renderMain();
+    removeSlots(keysToDelete);
+    closeAlloc(); renderMain();
 }
 
 // CONFIGURAÇÕES E SEGURANÇA
@@ -523,7 +639,7 @@ function toggleTheme() {
     if(isLight) document.body.classList.replace('light-theme', 'dark-theme');
     else document.body.classList.replace('dark-theme', 'light-theme');
     S.theme = isLight ? 'dark' : 'light';
-    save();
+    saveLocal();
 }
 
 function openConfig(){
@@ -559,7 +675,7 @@ function renderCfgBody(tab) {
                 </div>`).join('')}</div>
         `;
     } else if(tab === 'medicos') {
-        const activeDocs = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived);
+        const activeDocs   = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived);
         const archivedDocs = S.doctors.filter(d => d.unitId === S.currentUnit && d.archived);
         body.innerHTML = `
             <div class="form-group" style="margin-bottom:15px;">
@@ -635,7 +751,7 @@ function editUnit(id) {
 function saveUnitEdit(id) {
     const val = document.getElementById(`edit-u-${id}`).value.toUpperCase();
     const u = S.units.find(x => x.id === id);
-    if(val && u) { u.name = val; save(); renderCfgBody('unidade'); renderUnitSelect(); }
+    if(val && u) { u.name = val; saveConfig(); renderCfgBody('unidade'); renderUnitSelect(); }
 }
 
 function editRoom(id) {
@@ -651,7 +767,7 @@ function saveRoomEdit(id) {
     const val = document.getElementById(`edit-r-${id}`).value;
     const unit = S.units.find(u => u.id === S.currentUnit);
     const room = unit.rooms.find(r => r.id === id);
-    if(val && room) { room.name = val; save(); renderCfgBody('salas'); }
+    if(val && room) { room.name = val; saveConfig(); renderCfgBody('salas'); }
 }
 
 function setEditTgl(gid, btn) {
@@ -702,34 +818,34 @@ function saveDoctorEdit(id) {
         d.name = prefix + ' ' + cleanName;
         d.spec = spec;
         d.type = type;
-        save();
+        saveConfig();
         renderCfgBody('medicos');
         showToast('MÉDICO ATUALIZADO COM SUCESSO!');
     }
 }
 
 // OPERAÇÕES BÁSICAS
-function addUnit(){ const v=document.getElementById('newUnitInp').value.toUpperCase(); if(!v)return; S.units.push({id:'u'+Date.now(), name:v, rooms:[]}); save(); renderUnitSelect(); renderCfgBody('unidade'); }
-function deleteUnit(id){ if(!confirm("EXCLUIR UNIDADE?"))return; S.units=S.units.filter(u=>u.id!==id); if(S.currentUnit===id)S.currentUnit=S.units[0]?.id||null; save(); renderUnitSelect(); renderCfgBody('unidade'); }
+function addUnit(){ const v=document.getElementById('newUnitInp').value.toUpperCase(); if(!v)return; S.units.push({id:'u'+Date.now(), name:v, rooms:[]}); saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); }
+function deleteUnit(id){ if(!confirm("EXCLUIR UNIDADE?"))return; S.units=S.units.filter(u=>u.id!==id); if(S.currentUnit===id)S.currentUnit=S.units[0]?.id||null; saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); }
 
-function addRoom(){ const v=document.getElementById('newRoomInp').value; const unit=S.units.find(u=>u.id===S.currentUnit); if(!v||!unit)return; unit.rooms.push({id:'r'+Date.now(), name:v}); save(); renderCfgBody('salas'); }
-function deleteRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; unit.rooms=unit.rooms.filter(r=>r.id!==id); save(); renderCfgBody('salas'); }
+function addRoom(){ const v=document.getElementById('newRoomInp').value; const unit=S.units.find(u=>u.id===S.currentUnit); if(!v||!unit)return; unit.rooms.push({id:'r'+Date.now(), name:v}); saveConfig(); renderCfgBody('salas'); }
+function deleteRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; unit.rooms=unit.rooms.filter(r=>r.id!==id); saveConfig(); renderCfgBody('salas'); }
 
 function addDoctor(){
     const name=document.getElementById('newDocName').value; if(!name)return;
     const spec=document.getElementById('newDocSpec').value || 'Geral';
     S.doctors.push({id:'d'+Date.now(), name: curTgl.tglPrefix+' '+name, spec, type: curTgl.tglType, unitId: S.currentUnit});
-    save(); renderCfgBody('medicos'); showToast("MÉDICO CADASTRADO NA UNIDADE ATUAL.");
+    saveConfig(); renderCfgBody('medicos'); showToast("MÉDICO CADASTRADO NA UNIDADE ATUAL.");
 }
-function deleteDoctor(id){ if(!confirm("EXCLUIR MÉDICO?")) return; S.doctors=S.doctors.filter(d=>d.id!==id); save(); renderCfgBody('medicos'); }
+function deleteDoctor(id){ if(!confirm("EXCLUIR MÉDICO?")) return; S.doctors=S.doctors.filter(d=>d.id!==id); saveConfig(); renderCfgBody('medicos'); }
 
 function archiveDoctor(id) {
     const d = S.doctors.find(x => x.id === id);
-    if(d) { d.archived = true; save(); renderCfgBody('medicos'); showToast("PROFISSIONAL ARQUIVADO"); }
+    if(d) { d.archived = true; saveConfig(); renderCfgBody('medicos'); showToast("PROFISSIONAL ARQUIVADO"); }
 }
 function unarchiveDoctor(id) {
     const d = S.doctors.find(x => x.id === id);
-    if(d) { d.archived = false; save(); renderCfgBody('medicos'); showToast("PROFISSIONAL REATIVADO"); }
+    if(d) { d.archived = false; saveConfig(); renderCfgBody('medicos'); showToast("PROFISSIONAL REATIVADO"); }
 }
 
 function renderUnitSelect() { document.getElementById('unitSelect').innerHTML = S.units.map(u => `<option value="${u.id}" ${S.currentUnit===u.id?'selected':''}>${u.name}</option>`).join(''); }
@@ -755,7 +871,7 @@ function changeUnit(id) {
         if (activeTabId === 'tabSalas') renderCfgBody('salas');
         else if (activeTabId === 'tabMedicos') renderCfgBody('medicos');
     }
-    save();
+    saveLocal();
 }
 
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m.toUpperCase(); t.style.display='block'; setTimeout(()=>t.style.display='none', 2500); }
