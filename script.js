@@ -249,6 +249,13 @@ function renderMain() {
   const unit = S.units.find(u => u.id === S.currentUnit);
   if(!unit) { el.innerHTML = "Unidade não encontrada."; return; }
 
+  // Função auxiliar: sala visível para uma data específica?
+  function roomVisibleOnDate(r, dateStr) {
+      if (r.archived) return false;
+      if (r.archivedFrom && dateStr >= r.archivedFrom) return false;
+      return true;
+  }
+
   let dates = [];
   const isMonthView = S.view === 'month';
 
@@ -284,18 +291,18 @@ function renderMain() {
         <thead>
           <tr>
             <th style="width:50px"></th>
-            ${unit.rooms.map((r,i) => `<th class="room-th room-color-${i%5}" style="${r.archived ? 'opacity:0.45;text-decoration:line-through;' : ''}">${r.name}</th>`).join('')}
+            ${unit.rooms.filter(r => roomVisibleOnDate(r, date)).map((r,i) => `<th class="room-th room-color-${i%5}">${r.name}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
           ${['manha', 'tarde'].map(p => `
             <tr>
               <td class="side-label">${p === 'manha' ? 'MANHÃ' : 'TARDE'}</td>
-              ${unit.rooms.map(r => {
+              ${unit.rooms.filter(r => roomVisibleOnDate(r, date)).map(r => {
                 const key = `${unit.id}|${r.id}|${date}|${p}`;
                 const slot = S.slots[key];
                 return `
-                <td class="cell-slot${r.archived && !slot ? ' room-archived-empty' : ''}" id="td-${key}" onclick="openAlloc('${key}')"
+                <td class="cell-slot" id="td-${key}" onclick="openAlloc('${key}')"
                     ondragover="allowDrop(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${key}')">
                   ${slotHTML(slot, key, isMonthView)}
                 </td>`;
@@ -351,6 +358,12 @@ function slotHTML(slot, key, isMonthView) {
       return `
       <div class="mini-slot feriado" title="FERIADO" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
           ${isMonthView ? 'FER.' : 'FERIADO'}
+      </div>`;
+  }
+  if(slot.status === 'manutencao') {
+      return `
+      <div class="mini-slot manutencao" title="EM MANUTENÇÃO" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
+          ${isMonthView ? '🔧' : '🔧 MANUTENÇÃO'}
       </div>`;
   }
 
@@ -498,23 +511,31 @@ function applyMassClickToSlot(key) {
     const date = parts[2];
     const unit = S.units.find(u => u.id === unitId);
 
-    // Bloqueia novas alocações em sala arquivada (toggle só funciona se já existe slot)
+    // Bloqueia novas alocações em sala arquivada para esta data
     const roomObj = unit?.rooms.find(r => r.id === parts[1]);
-    if (roomObj?.archived && !S.slots[key]) { showToast("SALA ARQUIVADA — SEM NOVAS ALOCAÇÕES"); return; }
+    const roomBlocked = roomObj && (roomObj.archived || (roomObj.archivedFrom && date >= roomObj.archivedFrom));
+    if (roomBlocked && !S.slots[key]) { showToast("SALA ARQUIVADA — SEM NOVAS ALOCAÇÕES"); return; }
 
     const massDoc = S.doctors.find(d => d.id === massDocId);
     const effectiveNature = (massDoc && massDoc.defaultNature) ? massDoc.defaultNature : massNature;
+    const needsDoctor = massStatus !== 'feriado' && massStatus !== 'manutencao';
+
+    function buildSlot(k) {
+        if (massStatus === 'feriado')    return { status: 'feriado',    doctorId: null };
+        if (massStatus === 'manutencao') return { status: 'manutencao', doctorId: null };
+        return { doctorId: massDocId, status: massStatus, nature: effectiveNature, obs: '' };
+    }
 
     if (massDiaInteiro) {
         const allKeys = [];
         if (massStatus === 'feriado') {
-            // Feriado: todas as salas ativas do dia
-            unit.rooms.filter(r => !r.archived).forEach(r => {
+            // Feriado: todas as salas visíveis nesta data
+            unit.rooms.filter(r => !r.archived && (!r.archivedFrom || date < r.archivedFrom)).forEach(r => {
                 allKeys.push(`${unitId}|${r.id}|${date}|manha`);
                 allKeys.push(`${unitId}|${r.id}|${date}|tarde`);
             });
         } else {
-            // Médico: apenas a sala clicada, manhã + tarde
+            // Médico / Manutenção / Cancelado: apenas a sala clicada, manhã + tarde
             const roomId = parts[1];
             allKeys.push(`${unitId}|${roomId}|${date}|manha`);
             allKeys.push(`${unitId}|${roomId}|${date}|tarde`);
@@ -526,16 +547,9 @@ function applyMassClickToSlot(key) {
             allKeys.forEach(k => { delete S.slots[k]; });
             removeSlots(allKeys);
         } else {
-            if (massStatus !== 'feriado' && !massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
+            if (needsDoctor && !massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
             const toAdd = {};
-            allKeys.forEach(k => {
-                if (massStatus === 'feriado') {
-                    S.slots[k] = { status: 'feriado', doctorId: null };
-                } else {
-                    S.slots[k] = { doctorId: massDocId, status: massStatus, nature: effectiveNature, obs: '' };
-                }
-                toAdd[k] = S.slots[k];
-            });
+            allKeys.forEach(k => { S.slots[k] = buildSlot(k); toAdd[k] = S.slots[k]; });
             upsertSlots(toAdd);
         }
     } else {
@@ -544,12 +558,8 @@ function applyMassClickToSlot(key) {
             delete S.slots[key];
             removeSlot(key);
         } else {
-            if (massStatus === 'feriado') {
-                S.slots[key] = { status: 'feriado', doctorId: null };
-            } else {
-                if (!massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
-                S.slots[key] = { doctorId: massDocId, status: massStatus, nature: effectiveNature, obs: '' };
-            }
+            if (needsDoctor && !massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
+            S.slots[key] = buildSlot(key);
             upsertSlot(key, S.slots[key]);
         }
     }
@@ -566,9 +576,11 @@ function openAlloc(key) {
   // Bloqueia novas alocações em salas arquivadas (mas permite editar slots existentes)
   const slot = S.slots[key];
   const parts0 = key.split('|');
+  const date0 = parts0[2];
   const unitObj = S.units.find(u => u.id === parts0[0]);
   const roomObj = unitObj?.rooms.find(r => r.id === parts0[1]);
-  if (roomObj?.archived && !slot) { showToast("SALA ARQUIVADA — SEM NOVAS ALOCAÇÕES"); return; }
+  const roomBlocked = roomObj && (roomObj.archived || (roomObj.archivedFrom && date0 >= roomObj.archivedFrom));
+  if (roomBlocked && !slot) { showToast("SALA ARQUIVADA — SEM NOVAS ALOCAÇÕES"); return; }
   document.getElementById('allocKey').value = key;
   document.getElementById('allocModal').classList.add('open');
 
@@ -615,7 +627,7 @@ function saveAllocation() {
   const toSave = {};
 
   if (status === 'feriado') {
-      unit.rooms.filter(r => !r.archived).forEach(room => {
+      unit.rooms.filter(r => !r.archived && (!r.archivedFrom || date < r.archivedFrom)).forEach(room => {
           const k1 = `${unit.id}|${room.id}|${date}|${period}`;
           S.slots[k1] = { status: 'feriado', doctorId: null };
           toSave[k1] = S.slots[k1];
@@ -657,7 +669,7 @@ function deleteAllocation() {
     const keysToDelete = [];
 
     if (slot && slot.status === 'feriado') {
-        unit.rooms.filter(r => !r.archived).forEach(r => {
+        unit.rooms.filter(r => !r.archived && (!r.archivedFrom || date < r.archivedFrom)).forEach(r => {
             const k1 = `${unitId}|${r.id}|${date}|${period}`;
             delete S.slots[k1]; keysToDelete.push(k1);
             if (scope === 'diatodo') {
@@ -857,8 +869,8 @@ function renderCfgBody(tab) {
             </div>` : ''}
         `;
     } else {
-        const activeRooms   = unit.rooms.filter(r => !r.archived);
-        const archivedRooms = unit.rooms.filter(r => r.archived);
+        const activeRooms   = unit.rooms.filter(r => !r.archived && !r.archivedFrom);
+        const archivedRooms = unit.rooms.filter(r => r.archived || r.archivedFrom);
         body.innerHTML = `
             <div class="form-group"><label class="form-label">Adicionar Sala em: <strong style="color:var(--accent); text-transform:uppercase;">${unit.name}</strong></label>
             <div style="display:flex;gap:5px"><input class="inp" type="text" id="newRoomInp" placeholder="Ex: SALA 6"><button class="btn btn-primary" onclick="addRoom()">+</button></div></div>
@@ -867,7 +879,7 @@ function renderCfgBody(tab) {
                     <span id="txt-r-${r.id}">${r.name}</span>
                     <div class="cfg-row-actions">
                         <button class="btn btn-edit" onclick="editRoom('${r.id}')">✎</button>
-                        <button class="btn btn-archive" onclick="archiveRoom('${r.id}')" title="Arquivar sala">⊘</button>
+                        <button class="btn btn-archive" onclick="archiveRoom('${r.id}')" title="Arquivar sala a partir de uma data">⊘</button>
                         <button class="btn btn-danger" style="padding:5px 10px" onclick="deleteRoom('${r.id}')">✕</button>
                     </div>
                 </div>`).join('')}</div>
@@ -878,7 +890,10 @@ function renderCfgBody(tab) {
                 </div>
                 ${archivedRooms.map(r => `
                 <div class="cfg-row" id="row-r-${r.id}" style="opacity:0.55;">
-                    <span>${r.name}</span>
+                    <div style="display:flex;flex-direction:column;">
+                        <span>${r.name}</span>
+                        ${r.archivedFrom ? `<span style="font-size:9px;color:var(--t3);">a partir de ${r.archivedFrom}</span>` : ''}
+                    </div>
                     <div class="cfg-row-actions">
                         <button class="btn btn-primary" style="padding:5px 8px; font-size:9px;" onclick="unarchiveRoom('${r.id}')">REATIVAR</button>
                         <button class="btn btn-danger" style="padding:5px 10px" onclick="deleteRoom('${r.id}')">✕</button>
@@ -993,8 +1008,39 @@ function unarchiveUnit(id){ const u=S.units.find(x=>x.id===id); if(u){u.archived
 
 function addRoom(){ const v=document.getElementById('newRoomInp').value.toUpperCase(); const unit=S.units.find(u=>u.id===S.currentUnit); if(!v||!unit)return; unit.rooms.push({id:'r'+Date.now(), name:v}); saveConfig(); renderCfgBody('salas'); renderMain(); }
 function deleteRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; unit.rooms=unit.rooms.filter(r=>r.id!==id); saveConfig(); renderCfgBody('salas'); renderMain(); }
-function archiveRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; const r=unit.rooms.find(x=>x.id===id); if(r){r.archived=true; saveConfig(); renderCfgBody('salas'); renderMain(); showToast("SALA ARQUIVADA"); } }
-function unarchiveRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; const r=unit.rooms.find(x=>x.id===id); if(r){r.archived=false; saveConfig(); renderCfgBody('salas'); renderMain(); showToast("SALA REATIVADA"); } }
+function archiveRoom(id) {
+    const today = fmt(new Date());
+    const row = document.getElementById(`row-r-${id}`);
+    if (!row) return;
+    row.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap;">
+            <span style="font-size:10px;color:var(--t2);white-space:nowrap;">Arquivar a partir de:</span>
+            <input type="date" class="inp" id="archive-date-r-${id}" value="${today}" style="width:145px;padding:5px 8px;font-size:12px;">
+        </div>
+        <div class="cfg-row-actions">
+            <button class="btn btn-archive" style="padding:5px 10px;" onclick="confirmArchiveRoom('${id}')">✓</button>
+            <button class="btn btn-ghost" style="padding:5px 10px;" onclick="renderCfgBody('salas')">✕</button>
+        </div>`;
+}
+function confirmArchiveRoom(id) {
+    const dateVal = document.getElementById(`archive-date-r-${id}`)?.value;
+    const unit = S.units.find(u => u.id === S.currentUnit);
+    const r = unit?.rooms.find(x => x.id === id);
+    if (r && dateVal) {
+        r.archivedFrom = dateVal;
+        delete r.archived;
+        saveConfig(); renderCfgBody('salas'); renderMain();
+        showToast("SALA ARQUIVADA A PARTIR DE " + dateVal);
+    }
+}
+function unarchiveRoom(id) {
+    const unit = S.units.find(u => u.id === S.currentUnit);
+    const r = unit?.rooms.find(x => x.id === id);
+    if (r) {
+        delete r.archivedFrom; delete r.archived;
+        saveConfig(); renderCfgBody('salas'); renderMain(); showToast("SALA REATIVADA");
+    }
+}
 
 function addDoctor(){
     const name=document.getElementById('newDocName').value; if(!name)return;
