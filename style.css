@@ -100,10 +100,10 @@ body.light-theme .mini-name { color: #162033; font-weight: 800; }
 
 /* ── VISÃO MENSAL (COMPACTA) ── */
 .month-grid { grid-template-columns: repeat(6, 1fr); }
-.month-grid .cell-slot { height: 40px; padding: 1px !important; }
-.month-grid .mini-slot { padding: 1px; }
-.month-grid .mini-name { font-size: 8px !important; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; max-width: 100%; display: block; padding: 0 1px;}
-.month-grid .day-card { min-height: 100px; }
+.month-grid .cell-slot { height: 54px; padding: 1px !important; }
+.month-grid .mini-slot { padding: 2px 1px; }
+.month-grid .mini-name { font-size: 8px !important; margin-bottom: 0; word-break: break-word; overflow-wrap: break-word; line-height: 1.2; width: 100%; display: block; padding: 0 1px; overflow: hidden; }
+.month-grid .day-card { min-height: 120px; }
 .month-grid .room-th { font-size: 7px; padding: 3px 1px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .month-grid .side-label { width: 30px; font-size: 7px; }
 .month-grid .mini-slot.feriado { font-size: 7px; letter-spacing: 0; }

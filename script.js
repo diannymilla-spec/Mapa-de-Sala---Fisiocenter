@@ -160,7 +160,16 @@ async function init() {
         document.body.classList.add('light-theme');
     }
 
-    if(!S.weekAnchor) goToToday();
+    if(!S.weekAnchor) {
+        goToToday();
+    } else {
+        // Garante que o anchor sempre seja uma Segunda-feira
+        const anchor = parse(S.weekAnchor);
+        if (anchor.getDay() !== 1) {
+            S.weekAnchor = fmt(monday(anchor));
+            saveLocal();
+        }
+    }
     renderUnitSelect();
     renderMain();
 }
@@ -184,7 +193,7 @@ function goToToday() {
 
 function navStep(dir) {
   if(S.view === 'week') {
-    const d = parse(S.weekAnchor); d.setDate(d.getDate() + (dir * 7)); S.weekAnchor = fmt(d);
+    const d = parse(S.weekAnchor); d.setDate(d.getDate() + (dir * 7)); S.weekAnchor = fmt(monday(d));
   } else {
     S.monthMonth += dir;
     if(S.monthMonth < 0){ S.monthMonth=11; S.monthYear--; }
