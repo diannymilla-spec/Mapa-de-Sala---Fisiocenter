@@ -28,7 +28,8 @@ let curTgl = {
     tglType:'hora',
     tglAllocStatus:'active',
     tglAllocScope:'periodo',
-    tglAllocNature: 'Consulta'
+    tglAllocNature: 'Consulta',
+    tglDefaultNature: ''
 };
 
 // ── FORÇAR TEXTOS (MAIÚSCULAS/TITLE CASE) ──
@@ -171,7 +172,7 @@ function handleConfigTrigger() {
 
 // DATAS
 function monday(d){ const dt=new Date(d); const day=dt.getDay(); const diff = dt.getDate() - day + (day === 0 ? -6 : 1); return new Date(dt.setDate(diff)); }
-function fmt(d){return d.toISOString().split('T')[0]}
+function fmt(d){const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
 function parse(s){const p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2])}
 
 function goToToday() {
@@ -224,8 +225,12 @@ function renderMain() {
     });
   } else {
     const start = new Date(S.monthYear, S.monthMonth, 1);
-    const end = new Date(S.monthYear, S.monthMonth + 1, 0);
-    for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const end   = new Date(S.monthYear, S.monthMonth + 1, 0);
+    // Recua até a Segunda da semana que contém o dia 1
+    const startMonday = new Date(start);
+    const dow = startMonday.getDay();
+    if (dow !== 1) startMonday.setDate(startMonday.getDate() - (dow === 0 ? 6 : dow - 1));
+    for(let d = new Date(startMonday); d <= end; d.setDate(d.getDate() + 1)) {
         if(d.getDay() !== 0) dates.push(fmt(d));
     }
   }
@@ -235,6 +240,13 @@ function renderMain() {
   let h = `<div class="days-grid ${gridClass}">`;
   dates.forEach(date => {
     const dt = parse(date);
+
+    // Dias de padding do mês anterior → espaço invisível para alinhar o grid
+    if (isMonthView && !isMassMode && dt.getMonth() !== S.monthMonth) {
+      h += `<div style="visibility:hidden;pointer-events:none;"></div>`;
+      return;
+    }
+
     const isToday = fmt(new Date()) === date;
     const dayName = DAYS_PT[dt.getDay()];
 
@@ -426,12 +438,23 @@ function applyMassClickToSlot(key) {
     const date = parts[2];
     const unit = S.units.find(u => u.id === unitId);
 
+    const massDoc = S.doctors.find(d => d.id === massDocId);
+    const effectiveNature = (massDoc && massDoc.defaultNature) ? massDoc.defaultNature : massNature;
+
     if (massDiaInteiro) {
         const allKeys = [];
-        unit.rooms.forEach(r => {
-            allKeys.push(`${unitId}|${r.id}|${date}|manha`);
-            allKeys.push(`${unitId}|${r.id}|${date}|tarde`);
-        });
+        if (massStatus === 'feriado') {
+            // Feriado: todas as salas do dia
+            unit.rooms.forEach(r => {
+                allKeys.push(`${unitId}|${r.id}|${date}|manha`);
+                allKeys.push(`${unitId}|${r.id}|${date}|tarde`);
+            });
+        } else {
+            // Médico: apenas a sala clicada, manhã + tarde
+            const roomId = parts[1];
+            allKeys.push(`${unitId}|${roomId}|${date}|manha`);
+            allKeys.push(`${unitId}|${roomId}|${date}|tarde`);
+        }
 
         const anyFilled = allKeys.some(k => S.slots[k]);
 
@@ -445,7 +468,7 @@ function applyMassClickToSlot(key) {
                 if (massStatus === 'feriado') {
                     S.slots[k] = { status: 'feriado', doctorId: null };
                 } else {
-                    S.slots[k] = { doctorId: massDocId, status: massStatus, nature: massNature, obs: '' };
+                    S.slots[k] = { doctorId: massDocId, status: massStatus, nature: effectiveNature, obs: '' };
                 }
                 toAdd[k] = S.slots[k];
             });
@@ -461,7 +484,7 @@ function applyMassClickToSlot(key) {
                 S.slots[key] = { status: 'feriado', doctorId: null };
             } else {
                 if (!massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
-                S.slots[key] = { doctorId: massDocId, status: massStatus, nature: massNature, obs: '' };
+                S.slots[key] = { doctorId: massDocId, status: massStatus, nature: effectiveNature, obs: '' };
             }
             upsertSlot(key, S.slots[key]);
         }
@@ -509,8 +532,9 @@ function saveAllocation() {
   const docId  = document.getElementById('allocDocId').value;
   const status = curTgl.tglAllocStatus;
   const scope  = curTgl.tglAllocScope;
-  const nature = curTgl.tglAllocNature;
   const obs    = document.getElementById('allocObs').value.trim();
+  const doc    = S.doctors.find(d => d.id === docId);
+  const nature = (doc && doc.defaultNature) ? doc.defaultNature : curTgl.tglAllocNature;
 
   if(!docId && status !== 'feriado') { showToast("SELECIONE UM MÉDICO!"); return; }
 
@@ -675,8 +699,9 @@ function renderCfgBody(tab) {
                 </div>`).join('')}</div>
         `;
     } else if(tab === 'medicos') {
-        const activeDocs   = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived);
-        const archivedDocs = S.doctors.filter(d => d.unitId === S.currentUnit && d.archived);
+        const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
+        const activeDocs   = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived).sort(sortByName);
+        const archivedDocs = S.doctors.filter(d => d.unitId === S.currentUnit && d.archived).sort(sortByName);
         body.innerHTML = `
             <div class="form-group" style="margin-bottom:15px;">
                 <label class="form-label" style="font-size:11px; text-transform:none; letter-spacing:0;">
@@ -688,6 +713,14 @@ function renderCfgBody(tab) {
                 <div class="form-group"><label class="form-label">Nome Completo</label><input type="text" class="inp" id="newDocName"></div>
                 <div class="form-group"><label class="form-label">Especialidade</label><input type="text" class="inp" id="newDocSpec"></div>
                 <div class="form-group"><label class="form-label">Tipo de Atendimento</label><div class="toggle-group" id="tglType"><button class="tgl-btn active" onclick="setTgl('tglType',this,'hora')">Hora Marcada</button><button class="tgl-btn" onclick="setTgl('tglType',this,'ordem')">Ordem de Chegada</button></div></div>
+                <div class="form-group">
+                    <label class="form-label">Natureza Padrão <span style="color:var(--t3);font-weight:400;text-transform:none;">(opcional — sobrepõe a agenda)</span></label>
+                    <div class="toggle-group" id="tglDefaultNature">
+                        <button class="tgl-btn active" onclick="setTgl('tglDefaultNature',this,'')">Nenhuma</button>
+                        <button class="tgl-btn" onclick="setTgl('tglDefaultNature',this,'Consulta')">Consulta</button>
+                        <button class="tgl-btn" onclick="setTgl('tglDefaultNature',this,'Procedimento')">Procedimento</button>
+                    </div>
+                </div>
                 <button class="btn btn-primary" style="width:100%" onclick="addDoctor()">Cadastrar Médico</button>
             </div>
 
@@ -782,6 +815,7 @@ function editDoctor(id) {
     let prefix = d.name.startsWith('Dra.') ? 'Dra.' : 'Dr.';
     let cleanName = d.name.replace('Dr. ', '').replace('Dra. ', '');
     let type = d.type || 'hora';
+    let defNature = d.defaultNature || '';
 
     row.innerHTML = `
         <div style="display:flex; flex-direction:column; flex:1; gap:8px">
@@ -794,6 +828,12 @@ function editDoctor(id) {
             <div class="toggle-group" id="edit-tglType-${id}">
                 <button class="tgl-btn ${type === 'hora' ? 'active' : ''}" data-val="hora" onclick="setEditTgl('edit-tglType-${id}', this)">Hora Marcada</button>
                 <button class="tgl-btn ${type === 'ordem' ? 'active' : ''}" data-val="ordem" onclick="setEditTgl('edit-tglType-${id}', this)">Ordem de Chegada</button>
+            </div>
+            <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;">Natureza Padrão <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
+            <div class="toggle-group" id="edit-tglDefNature-${id}">
+                <button class="tgl-btn ${defNature === '' ? 'active' : ''}" data-val="" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Nenhuma</button>
+                <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" data-val="Consulta" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Consulta</button>
+                <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" data-val="Procedimento" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Procedimento</button>
             </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:5px; margin-left:10px; align-items:center; justify-content:center;">
@@ -813,11 +853,15 @@ function saveDoctorEdit(id) {
     const typeBtn = document.querySelector(`#edit-tglType-${id} .active`);
     const type = typeBtn ? typeBtn.getAttribute('data-val') : 'hora';
 
+    const defNatureBtn = document.querySelector(`#edit-tglDefNature-${id} .active`);
+    const defaultNature = defNatureBtn ? defNatureBtn.getAttribute('data-val') : '';
+
     const d = S.doctors.find(x => x.id === id);
     if(cleanName && d) {
         d.name = prefix + ' ' + cleanName;
         d.spec = spec;
         d.type = type;
+        d.defaultNature = defaultNature || null;
         saveConfig();
         renderCfgBody('medicos');
         showToast('MÉDICO ATUALIZADO COM SUCESSO!');
@@ -834,7 +878,10 @@ function deleteRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!u
 function addDoctor(){
     const name=document.getElementById('newDocName').value; if(!name)return;
     const spec=document.getElementById('newDocSpec').value || 'Geral';
-    S.doctors.push({id:'d'+Date.now(), name: curTgl.tglPrefix+' '+name, spec, type: curTgl.tglType, unitId: S.currentUnit});
+    const doc = {id:'d'+Date.now(), name: curTgl.tglPrefix+' '+name, spec, type: curTgl.tglType, unitId: S.currentUnit};
+    if (curTgl.tglDefaultNature) doc.defaultNature = curTgl.tglDefaultNature;
+    S.doctors.push(doc);
+    curTgl.tglDefaultNature = '';
     saveConfig(); renderCfgBody('medicos'); showToast("MÉDICO CADASTRADO NA UNIDADE ATUAL.");
 }
 function deleteDoctor(id){ if(!confirm("EXCLUIR MÉDICO?")) return; S.doctors=S.doctors.filter(d=>d.id!==id); saveConfig(); renderCfgBody('medicos'); }
