@@ -249,18 +249,12 @@ function renderMain() {
   let h = `<div class="days-grid ${gridClass}">`;
   dates.forEach(date => {
     const dt = parse(date);
-
-    // Dias de padding do mês anterior → espaço invisível para alinhar o grid
-    if (isMonthView && !isMassMode && dt.getMonth() !== S.monthMonth) {
-      h += `<div style="visibility:hidden;pointer-events:none;"></div>`;
-      return;
-    }
-
+    const isPrevMonth = isMonthView && dt.getMonth() !== S.monthMonth;
     const isToday = fmt(new Date()) === date;
     const dayName = DAYS_PT[dt.getDay()];
 
     h += `
-    <div class="day-card" style="${isToday ? 'border:2px solid var(--accent)' : ''}">
+    <div class="day-card${isPrevMonth ? ' day-card--prev-month' : ''}" style="${isToday ? 'border:2px solid var(--accent)' : ''}">
       <div class="day-header">${dayName} ${dt.getDate()}/${dt.getMonth()+1}</div>
       <table class="day-table">
         <thead>
@@ -290,6 +284,24 @@ function renderMain() {
   });
   h += `</div>`;
   el.innerHTML = h;
+  requestAnimationFrame(fitNames);
+}
+
+// Encolhe o font-size de cada nome até caber em 1 linha sem quebrar
+function fitNames() {
+  document.querySelectorAll('.mini-name').forEach(el => {
+    el.style.fontSize = '';
+    const slot = el.closest('.mini-slot');
+    if (!slot) return;
+    const maxW = slot.clientWidth - 6;
+    if (maxW <= 0) return;
+    let size = parseFloat(window.getComputedStyle(el).fontSize);
+    const minSize = 5.5;
+    while (el.scrollWidth > maxW && size > minSize) {
+      size -= 0.5;
+      el.style.fontSize = size + 'px';
+    }
+  });
 }
 
 function slotHTML(slot, key, isMonthView) {
@@ -330,18 +342,10 @@ function slotHTML(slot, key, isMonthView) {
   let displayNameFull = doc.name.replace(/^(Dr\.|Dra\.)\s+/i, '');
   let displayName = isMonthView ? displayNameFull.split(' ')[0] : displayNameFull;
 
-  let nameStyle = "";
-  if (!isMonthView) {
-      const len = displayName.length;
-      if (len <= 13) nameStyle = 'style="font-size: 13px;"';
-      else if (len <= 17) nameStyle = 'style="font-size: 12px;"';
-      else nameStyle = 'style="font-size: 11px;"';
-  }
-
   return `
     <div class="mini-slot ${slot.status}" title="${tooltip}" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
         ${obsWarning}
-        <span class="mini-name" ${nameStyle}>${displayName}</span>
+        <span class="mini-name">${displayName}</span>
         ${(!isMonthView && tags.length > 0) ? `<div class="mini-tags">${tags.join('')}</div>` : ''}
     </div>`;
 }
