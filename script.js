@@ -340,12 +340,21 @@ function slotHTML(slot, key, isMonthView) {
   }
 
   let displayNameFull = doc.name.replace(/^(Dr\.|Dra\.)\s+/i, '');
-  let displayName = isMonthView ? displayNameFull.split(' ')[0] : displayNameFull;
+
+  let nameHTML = '';
+  if (isMonthView) {
+      nameHTML = `<span class="mini-name">${displayNameFull.split(' ')[0]}</span>`;
+  } else {
+      const nameParts = displayNameFull.split(' ');
+      nameHTML = `<span class="mini-name">${nameParts[0]}</span>`;
+      if (nameParts.length > 1) nameHTML += `<span class="mini-name">${nameParts.slice(1).join(' ')}</span>`;
+      nameHTML += `<span class="mini-spec">${doc.spec}</span>`;
+  }
 
   return `
     <div class="mini-slot ${slot.status}" title="${tooltip}" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
         ${obsWarning}
-        <span class="mini-name">${displayName}</span>
+        ${nameHTML}
         ${(!isMonthView && tags.length > 0) ? `<div class="mini-tags">${tags.join('')}</div>` : ''}
     </div>`;
 }
