@@ -287,8 +287,10 @@ function renderMain() {
   requestAnimationFrame(fitNames);
 }
 
-// Encolhe o font-size de cada nome até caber em 1 linha sem quebrar
+// Encolhe o font-size de cada nome até caber em 1 linha sem quebrar,
+// depois sincroniza todas as linhas do mesmo slot para o menor tamanho encontrado
 function fitNames() {
+  // 1ª passagem: ajusta cada span individualmente
   document.querySelectorAll('.mini-name').forEach(el => {
     el.style.fontSize = '';
     const slot = el.closest('.mini-slot');
@@ -301,6 +303,18 @@ function fitNames() {
       size -= 0.5;
       el.style.fontSize = size + 'px';
     }
+  });
+
+  // 2ª passagem: dentro de cada slot, iguala todos os spans ao menor tamanho
+  document.querySelectorAll('.mini-slot').forEach(slot => {
+    const spans = slot.querySelectorAll('.mini-name');
+    if (spans.length <= 1) return;
+    let minSize = Infinity;
+    spans.forEach(s => {
+      const sz = parseFloat(s.style.fontSize || window.getComputedStyle(s).fontSize);
+      if (sz < minSize) minSize = sz;
+    });
+    spans.forEach(s => { s.style.fontSize = minSize + 'px'; });
   });
 }
 
