@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Sala - CS Fisiocenter</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+
+<div class="topbar">
+  <div class="logo">Mapa de Sala - CS Fisiocenter <span id="cfgBadge" class="config-badge">MODO CONFIG ATIVO</span></div>
+  <div class="unit-selector">
+    <select class="unit-select" id="unitSelect" onchange="changeUnit(this.value)"></select>
+  </div>
+
+  <div class="tb-right">
+    <button class="mass-btn" id="massAllocBtn" onclick="toggleMassMode()" style="display:none;" title="Alocação em Massa Rápida">⚡ EM MASSA</button>
+    <button class="nav-btn" onclick="toggleTheme()" title="Alternar Tema Claro/Escuro" style="font-size:14px; margin-right:4px;">🌓</button>
+    <button class="nav-btn" id="exitCfgBtn" onclick="exitConfigMode()" title="Sair do Modo de Configuração" style="display:none; color: var(--cancel); margin-right:4px; font-size:10px; font-weight:bold; width:auto; padding:0 8px;">SAIR DA CONFIG</button>
+
+    <div class="view-switch">
+        <button class="vs-btn active" id="btnWeek" onclick="setView('week')">Semana</button>
+        <button class="vs-btn" id="btnMonth" onclick="setView('month')">Mês</button>
+    </div>
+
+    <div class="nav-group">
+      <button class="nav-btn" onclick="navStep(-1)">‹</button>
+      <button class="btn-today" onclick="goToToday()">Hoje</button>
+      <div class="nav-label" id="navLabel">...</div>
+      <button class="nav-btn" onclick="navStep(1)">›</button>
+    </div>
+
+    <button class="nav-btn" id="cfgToggleBtn" onclick="handleConfigTrigger()" style="font-size:18px">⚙</button>
+  </div>
+</div>
+
+<!-- TOOLBAR DE ALOCAÇÃO EM MASSA -->
+<div id="massToolbar" class="mass-toolbar" style="display:none;">
+    <div style="display:flex; align-items:center; gap: 12px; flex:1;">
+        <div style="font-weight: 900; color: var(--accent); font-size: 13px;">⚡ PINCEL DE ALOCAÇÃO</div>
+        <div style="width:1px; height:20px; background:var(--border);"></div>
+
+        <label style="font-size:10px; font-weight:bold; color:var(--t3);">MÉDICO</label>
+        <select class="sel" id="massToolbarDoc" style="width: 200px; padding: 6px 10px; font-size:11px; margin:0;" onchange="massDocId = this.value"></select>
+
+        <div style="width:1px; height:20px; background:var(--border);"></div>
+
+        <label style="font-size:10px; font-weight:bold; color:var(--t3);">NATUREZA</label>
+        <div class="toggle-group" id="tglMassToolbarNature" style="width: 180px;">
+          <button class="tgl-btn active" style="padding:6px;" onclick="setTgl('tglMassToolbarNature', this, 'Consulta'); massNature='Consulta'">Consulta</button>
+          <button class="tgl-btn" style="padding:6px;" onclick="setTgl('tglMassToolbarNature', this, 'Procedimento'); massNature='Procedimento'">Proc.</button>
+        </div>
+
+        <div style="width:1px; height:20px; background:var(--border);"></div>
+
+        <label style="font-size:10px; font-weight:bold; color:var(--t3);">AÇÃO AO CLICAR</label>
+        <div class="toggle-group" id="tglMassToolbarStatus" style="width: 320px;">
+          <button class="tgl-btn active" style="padding:6px;" onclick="setTgl('tglMassToolbarStatus', this, 'active'); massStatus='active'">Ativo</button>
+          <button class="tgl-btn" style="padding:6px;" onclick="setTgl('tglMassToolbarStatus', this, 'canceled'); massStatus='canceled'">Canc.</button>
+          <button class="tgl-btn" style="padding:6px;" onclick="setTgl('tglMassToolbarStatus', this, 'feriado'); massStatus='feriado'">Feriado</button>
+        </div>
+
+        <div style="width:1px; height:20px; background:var(--border);"></div>
+
+        <label style="font-size:10px; font-weight:bold; color:var(--t3);">ESCOPO</label>
+        <button id="btnMassDiaInteiro" class="tgl-btn" style="padding:6px 10px;" onclick="toggleMassDiaInteiro(this)">Dia Inteiro</button>
+    </div>
+    <button class="btn btn-danger" style="padding: 6px 12px; font-size:10px;" onclick="toggleMassMode()">FECHAR PINCEL</button>
+</div>
+
+<div class="content" id="mainContent"></div>
+
+<!-- MODAL ALOCAÇÃO SIMPLES -->
+<div class="modal-overlay" id="allocModal">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <h3 style="margin-bottom:20px; font-family:'Fraunces'; font-size:18px; color:var(--accent);">Alocar Atendimento</h3>
+    <input type="hidden" id="allocKey">
+
+    <div class="form-group">
+      <label class="form-label">Médico</label>
+      <select class="sel" id="allocDocId"></select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Natureza do Serviço</label>
+      <div class="toggle-group" id="tglAllocNature">
+          <button class="tgl-btn active" onclick="setTgl('tglAllocNature', this, 'Consulta')">Consulta</button>
+          <button class="tgl-btn" onclick="setTgl('tglAllocNature', this, 'Procedimento')">Procedimento</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Status do Horário</label>
+      <div class="toggle-group" id="tglAllocStatus">
+          <button class="tgl-btn active" onclick="setTgl('tglAllocStatus', this, 'active')">Ativo</button>
+          <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'canceled')">Cancelado</button>
+          <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'feriado')">Feriado</button>
+      </div>
+    </div>
+
+    <div class="form-group" id="scopeGroup">
+      <label class="form-label">Aplicar em:</label>
+      <div class="toggle-group" id="tglAllocScope">
+          <button class="tgl-btn active" onclick="setTgl('tglAllocScope', this, 'periodo')">Este Turno</button>
+          <button class="tgl-btn" onclick="setTgl('tglAllocScope', this, 'diatodo')">Dia Todo</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Observação (Opcional - Exibe Alerta ⚠️)</label>
+      <input class="inp" type="text" id="allocObs" placeholder="Ex: paciente preferencial..." autocomplete="off">
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:25px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeAlloc()">Sair</button>
+      <button class="btn btn-danger" id="btnDelAlloc" onclick="deleteAllocation()">Limpar</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveAllocation()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOCK/SENHA -->
+<div class="modal-overlay" id="lockOverlay" onclick="closeLock()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <h3 style="text-align:center; margin-bottom:15px; font-family:'Fraunces'">🔒 Acesso Restrito</h3>
+    <p style="text-align:center; font-size:11px; color:var(--t2); margin-bottom:15px">Digite a senha para habilitar edições, arrastar e alocar médicos.</p>
+    <input class="inp" id="lockInp" type="password" placeholder="Digite a senha" style="text-align:center; font-size:18px">
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeLock()">Voltar</button>
+      <button class="btn btn-primary" style="flex:1" onclick="tryUnlock()">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG DRAWER -->
+<div class="cfg-panel" id="cfgPanel">
+  <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--s2)">
+    <h3 style="font-family:'Fraunces'">Painel de Controle</h3>
+    <button class="btn" style="padding:5px 10px" onclick="closeConfig()">✕</button>
+  </div>
+  <div class="cfg-tabs">
+    <div class="cfg-tab active" id="tabUnidade" onclick="switchCfgTab('unidade')">Unidades</div>
+    <div class="cfg-tab" id="tabSalas" onclick="switchCfgTab('salas')">Salas</div>
+    <div class="cfg-tab" id="tabMedicos" onclick="switchCfgTab('medicos')">Médicos</div>
+  </div>
+  <div class="cfg-body" id="cfgBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
