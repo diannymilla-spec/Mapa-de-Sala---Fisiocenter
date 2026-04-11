@@ -18,6 +18,7 @@ let S = {
 
 // { unitId: true } para cada unidade desbloqueada. Admin desbloqueia todas.
 let configActive = {};
+let isAdminActive = false;
 
 // Mapa de role (retornado pela API) → nome da unidade no sistema
 const ROLE_UNIT_NAME = {
@@ -36,6 +37,9 @@ function updateConfigUI() {
     document.getElementById('cfgToggleBtn').style.color    = currentActive ? 'var(--active)' : '';
     document.getElementById('exitCfgBtn').style.display    = anyActive     ? 'flex' : 'none';
     document.getElementById('massAllocBtn').style.display  = currentActive ? 'flex' : 'none';
+    // Aba Unidades visível somente para ADM
+    const tabUnEl = document.getElementById('tabUnidade');
+    if (tabUnEl) tabUnEl.style.display = isAdminActive ? '' : 'none';
 }
 let isMassMode = false;
 let massDocId = '';
@@ -244,6 +248,7 @@ function renderMain() {
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if(!unit) { el.innerHTML = "Unidade não encontrada."; return; }
+  const activeRooms = unit.rooms.filter(r => !r.archived);
 
   let dates = [];
   const isMonthView = S.view === 'month';
@@ -280,14 +285,14 @@ function renderMain() {
         <thead>
           <tr>
             <th style="width:50px"></th>
-            ${unit.rooms.map((r,i) => `<th class="room-th room-color-${i%5}">${r.name}</th>`).join('')}
+            ${activeRooms.map((r,i) => `<th class="room-th room-color-${i%5}">${r.name}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
           ${['manha', 'tarde'].map(p => `
             <tr>
               <td class="side-label">${p === 'manha' ? 'MANHÃ' : 'TARDE'}</td>
-              ${unit.rooms.map(r => {
+              ${activeRooms.map(r => {
                 const key = `${unit.id}|${r.id}|${date}|${p}`;
                 const slot = S.slots[key];
                 return `
@@ -500,8 +505,8 @@ function applyMassClickToSlot(key) {
     if (massDiaInteiro) {
         const allKeys = [];
         if (massStatus === 'feriado') {
-            // Feriado: todas as salas do dia
-            unit.rooms.forEach(r => {
+            // Feriado: todas as salas ativas do dia
+            unit.rooms.filter(r => !r.archived).forEach(r => {
                 allKeys.push(`${unitId}|${r.id}|${date}|manha`);
                 allKeys.push(`${unitId}|${r.id}|${date}|tarde`);
             });
@@ -602,7 +607,7 @@ function saveAllocation() {
   const toSave = {};
 
   if (status === 'feriado') {
-      unit.rooms.forEach(room => {
+      unit.rooms.filter(r => !r.archived).forEach(room => {
           const k1 = `${unit.id}|${room.id}|${date}|${period}`;
           S.slots[k1] = { status: 'feriado', doctorId: null };
           toSave[k1] = S.slots[k1];
@@ -644,7 +649,7 @@ function deleteAllocation() {
     const keysToDelete = [];
 
     if (slot && slot.status === 'feriado') {
-        unit.rooms.forEach(r => {
+        unit.rooms.filter(r => !r.archived).forEach(r => {
             const k1 = `${unitId}|${r.id}|${date}|${period}`;
             delete S.slots[k1]; keysToDelete.push(k1);
             if (scope === 'diatodo') {
@@ -688,6 +693,7 @@ async function tryUnlock() {
         if (data.ok) {
             if (data.role === 'admin') {
                 // Senha mestra: desbloqueia todas as unidades
+                isAdminActive = true;
                 S.units.forEach(u => { configActive[u.id] = true; });
                 showToast("ACESSO TOTAL LIBERADO — TODAS AS UNIDADES");
             } else {
@@ -715,6 +721,7 @@ async function tryUnlock() {
 function exitConfigMode() {
     if(isMassMode) toggleMassMode();
     configActive = {};
+    isAdminActive = false;
     updateConfigUI();
     closeConfig();
     showToast("MODO DE VISUALIZAÇÃO ATIVO (APENAS LEITURA)");
@@ -731,7 +738,7 @@ function toggleTheme() {
 
 function openConfig(){
     document.getElementById('cfgPanel').classList.add('open');
-    switchCfgTab('unidade');
+    switchCfgTab(isAdminActive ? 'unidade' : 'salas');
 }
 function closeConfig(){
     document.getElementById('cfgPanel').classList.remove('open');
@@ -739,8 +746,13 @@ function closeConfig(){
 }
 
 function switchCfgTab(tab) {
+  // A aba de unidades só fica visível para ADM
+  const tabUnEl = document.getElementById('tabUnidade');
+  if (tabUnEl) tabUnEl.style.display = isAdminActive ? '' : 'none';
+
   document.querySelectorAll('.cfg-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
+  const targetTab = document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1));
+  if (targetTab) targetTab.classList.add('active');
   renderCfgBody(tab);
 }
 
@@ -749,17 +761,34 @@ function renderCfgBody(tab) {
     const unit = S.units.find(u => u.id === S.currentUnit);
 
     if(tab === 'unidade') {
+        const activeUnits   = S.units.filter(u => !u.archived);
+        const archivedUnits = S.units.filter(u => u.archived);
         body.innerHTML = `
             <div class="form-group"><label class="form-label">Cadastrar Nova Unidade</label>
             <div style="display:flex;gap:5px"><input class="inp" type="text" id="newUnitInp" placeholder="NOME DA UNIDADE..."><button class="btn btn-primary" onclick="addUnit()">+</button></div></div>
-            <div style="margin-top:20px">${S.units.map(u => `
+            <div style="margin-top:20px">${activeUnits.map(u => `
                 <div class="cfg-row" id="row-u-${u.id}">
                     <span id="txt-u-${u.id}">${u.name}</span>
                     <div class="cfg-row-actions">
                         <button class="btn btn-edit" onclick="editUnit('${u.id}')">✎</button>
+                        <button class="btn btn-archive" onclick="archiveUnit('${u.id}')" title="Arquivar unidade">⊘</button>
                         <button class="btn btn-danger" style="padding:5px 10px" onclick="deleteUnit('${u.id}')">✕</button>
                     </div>
                 </div>`).join('')}</div>
+            ${archivedUnits.length > 0 ? `
+            <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:12px;">
+                <div style="font-size:9px; font-weight:900; text-transform:uppercase; color:var(--t3); letter-spacing:1px; margin-bottom:10px;">
+                    Arquivadas (${archivedUnits.length})
+                </div>
+                ${archivedUnits.map(u => `
+                <div class="cfg-row" id="row-u-${u.id}" style="opacity:0.55;">
+                    <span>${u.name}</span>
+                    <div class="cfg-row-actions">
+                        <button class="btn btn-primary" style="padding:5px 8px; font-size:9px;" onclick="unarchiveUnit('${u.id}')">REATIVAR</button>
+                        <button class="btn btn-danger" style="padding:5px 10px" onclick="deleteUnit('${u.id}')">✕</button>
+                    </div>
+                </div>`).join('')}
+            </div>` : ''}
         `;
     } else if(tab === 'medicos') {
         const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
@@ -820,17 +849,34 @@ function renderCfgBody(tab) {
             </div>` : ''}
         `;
     } else {
+        const activeRooms   = unit.rooms.filter(r => !r.archived);
+        const archivedRooms = unit.rooms.filter(r => r.archived);
         body.innerHTML = `
             <div class="form-group"><label class="form-label">Adicionar Sala em: <strong style="color:var(--accent); text-transform:uppercase;">${unit.name}</strong></label>
             <div style="display:flex;gap:5px"><input class="inp" type="text" id="newRoomInp" placeholder="Ex: SALA 6"><button class="btn btn-primary" onclick="addRoom()">+</button></div></div>
-            <div style="margin-top:20px">${unit.rooms.map(r => `
+            <div style="margin-top:20px">${activeRooms.map(r => `
                 <div class="cfg-row" id="row-r-${r.id}">
                     <span id="txt-r-${r.id}">${r.name}</span>
                     <div class="cfg-row-actions">
                         <button class="btn btn-edit" onclick="editRoom('${r.id}')">✎</button>
+                        <button class="btn btn-archive" onclick="archiveRoom('${r.id}')" title="Arquivar sala">⊘</button>
                         <button class="btn btn-danger" style="padding:5px 10px" onclick="deleteRoom('${r.id}')">✕</button>
                     </div>
                 </div>`).join('')}</div>
+            ${archivedRooms.length > 0 ? `
+            <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:12px;">
+                <div style="font-size:9px; font-weight:900; text-transform:uppercase; color:var(--t3); letter-spacing:1px; margin-bottom:10px;">
+                    Arquivadas (${archivedRooms.length})
+                </div>
+                ${archivedRooms.map(r => `
+                <div class="cfg-row" id="row-r-${r.id}" style="opacity:0.55;">
+                    <span>${r.name}</span>
+                    <div class="cfg-row-actions">
+                        <button class="btn btn-primary" style="padding:5px 8px; font-size:9px;" onclick="unarchiveRoom('${r.id}')">REATIVAR</button>
+                        <button class="btn btn-danger" style="padding:5px 10px" onclick="deleteRoom('${r.id}')">✕</button>
+                    </div>
+                </div>`).join('')}
+            </div>` : ''}
         `;
     }
 }
@@ -933,10 +979,14 @@ function saveDoctorEdit(id) {
 
 // OPERAÇÕES BÁSICAS
 function addUnit(){ const v=document.getElementById('newUnitInp').value.toUpperCase(); if(!v)return; S.units.push({id:'u'+Date.now(), name:v, rooms:[]}); saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); }
-function deleteUnit(id){ if(!confirm("EXCLUIR UNIDADE?"))return; S.units=S.units.filter(u=>u.id!==id); if(S.currentUnit===id)S.currentUnit=S.units[0]?.id||null; saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); }
+function deleteUnit(id){ if(!confirm("EXCLUIR UNIDADE?"))return; S.units=S.units.filter(u=>u.id!==id); if(S.currentUnit===id){const first=S.units.find(u=>!u.archived);S.currentUnit=first?.id||null;} saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); }
+function archiveUnit(id){ const u=S.units.find(x=>x.id===id); if(u){u.archived=true; if(S.currentUnit===id){const first=S.units.find(x=>!x.archived);S.currentUnit=first?.id||null;} saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); showToast("UNIDADE ARQUIVADA"); renderMain(); } }
+function unarchiveUnit(id){ const u=S.units.find(x=>x.id===id); if(u){u.archived=false; saveConfig(); renderUnitSelect(); renderCfgBody('unidade'); showToast("UNIDADE REATIVADA"); } }
 
-function addRoom(){ const v=document.getElementById('newRoomInp').value.toUpperCase(); const unit=S.units.find(u=>u.id===S.currentUnit); if(!v||!unit)return; unit.rooms.push({id:'r'+Date.now(), name:v}); saveConfig(); renderCfgBody('salas'); }
-function deleteRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; unit.rooms=unit.rooms.filter(r=>r.id!==id); saveConfig(); renderCfgBody('salas'); }
+function addRoom(){ const v=document.getElementById('newRoomInp').value.toUpperCase(); const unit=S.units.find(u=>u.id===S.currentUnit); if(!v||!unit)return; unit.rooms.push({id:'r'+Date.now(), name:v}); saveConfig(); renderCfgBody('salas'); renderMain(); }
+function deleteRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; unit.rooms=unit.rooms.filter(r=>r.id!==id); saveConfig(); renderCfgBody('salas'); renderMain(); }
+function archiveRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; const r=unit.rooms.find(x=>x.id===id); if(r){r.archived=true; saveConfig(); renderCfgBody('salas'); renderMain(); showToast("SALA ARQUIVADA"); } }
+function unarchiveRoom(id){ const unit=S.units.find(u=>u.id===S.currentUnit); if(!unit)return; const r=unit.rooms.find(x=>x.id===id); if(r){r.archived=false; saveConfig(); renderCfgBody('salas'); renderMain(); showToast("SALA REATIVADA"); } }
 
 function addDoctor(){
     const name=document.getElementById('newDocName').value; if(!name)return;
@@ -958,7 +1008,15 @@ function unarchiveDoctor(id) {
     if(d) { d.archived = false; saveConfig(); renderCfgBody('medicos'); showToast("PROFISSIONAL REATIVADO"); }
 }
 
-function renderUnitSelect() { document.getElementById('unitSelect').innerHTML = S.units.map(u => `<option value="${u.id}" ${S.currentUnit===u.id?'selected':''}>${u.name}</option>`).join(''); }
+function renderUnitSelect() {
+    const activeUnits = S.units.filter(u => !u.archived);
+    // Se a unidade atual foi arquivada, muda para a primeira disponível
+    if (!activeUnits.find(u => u.id === S.currentUnit) && activeUnits.length > 0) {
+        S.currentUnit = activeUnits[0].id;
+        saveLocal();
+    }
+    document.getElementById('unitSelect').innerHTML = activeUnits.map(u => `<option value="${u.id}" ${S.currentUnit===u.id?'selected':''}>${u.name}</option>`).join('');
+}
 
 function changeUnit(id) {
     S.currentUnit=id;
