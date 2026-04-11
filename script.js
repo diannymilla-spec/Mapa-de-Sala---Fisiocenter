@@ -16,7 +16,27 @@ let S = {
   weekAnchor: null, monthYear: new Date().getFullYear(), monthMonth: new Date().getMonth()
 };
 
-let configActive = false;
+// { unitId: true } para cada unidade desbloqueada. Admin desbloqueia todas.
+let configActive = {};
+
+// Mapa de role (retornado pela API) → nome da unidade no sistema
+const ROLE_UNIT_NAME = {
+    ambulatorio:  'AMBULATÓRIO',
+    fisioterapia: 'FISIOTERAPIA',
+    abaetetuba:   'ABAETETUBA'
+};
+
+function isEditActive(unitId) { return configActive[unitId] === true; }
+function isAnyEditActive()    { return Object.values(configActive).some(Boolean); }
+
+function updateConfigUI() {
+    const anyActive     = isAnyEditActive();
+    const currentActive = isEditActive(S.currentUnit);
+    document.getElementById('cfgBadge').style.display      = anyActive     ? 'inline-block' : 'none';
+    document.getElementById('cfgToggleBtn').style.color    = currentActive ? 'var(--active)' : '';
+    document.getElementById('exitCfgBtn').style.display    = anyActive     ? 'flex' : 'none';
+    document.getElementById('massAllocBtn').style.display  = currentActive ? 'flex' : 'none';
+}
 let isMassMode = false;
 let massDocId = '';
 let massNature = 'Consulta';
@@ -176,7 +196,7 @@ async function init() {
 
 // SEGURANÇA E ARRASTAR
 function handleConfigTrigger() {
-    if(configActive) openConfig(); else openLock();
+    if(isEditActive(S.currentUnit)) openConfig(); else openLock();
 }
 
 // DATAS
@@ -321,7 +341,7 @@ function fitNames() {
 function slotHTML(slot, key, isMonthView) {
   if(!slot) return '';
 
-  const draggableAttr = configActive && !isMassMode ? 'true' : 'false';
+  const draggableAttr = isEditActive(S.currentUnit) && !isMassMode ? 'true' : 'false';
 
   if(slot.status === 'feriado') {
       return `
@@ -375,11 +395,11 @@ function slotHTML(slot, key, isMonthView) {
 
 // DRAG AND DROP HANDLERS
 function handleDragStart(e, key) {
-    if(!configActive || isMassMode) return;
+    if(!isEditActive(S.currentUnit) || isMassMode) return;
     e.dataTransfer.setData("text", key);
 }
 function allowDrop(e) {
-    if(!configActive || isMassMode) return;
+    if(!isEditActive(S.currentUnit) || isMassMode) return;
     e.preventDefault();
     e.currentTarget.classList.add('drag-over');
 }
@@ -387,7 +407,7 @@ function handleDragLeave(e) {
     e.currentTarget.classList.remove('drag-over');
 }
 function handleDrop(e, targetKey) {
-    if(!configActive || isMassMode) return;
+    if(!isEditActive(S.currentUnit) || isMassMode) return;
     e.preventDefault();
     e.currentTarget.classList.remove('drag-over');
 
@@ -531,7 +551,7 @@ function applyMassClickToSlot(key) {
 
 // ALOCAÇÃO SIMPLES (MODAL) E EXCLUSÃO
 function openAlloc(key) {
-  if(!configActive) { openLock(); return; }
+  if(!isEditActive(S.currentUnit)) { openLock(); return; }
 
   if(isMassMode) { applyMassClickToSlot(key); return; }
 
@@ -666,13 +686,23 @@ async function tryUnlock() {
         });
         const data = await res.json();
         if (data.ok) {
-            configActive = true;
-            document.getElementById('cfgBadge').style.display = 'inline-block';
-            document.getElementById('cfgToggleBtn').style.color = 'var(--active)';
-            document.getElementById('exitCfgBtn').style.display = 'flex';
-            document.getElementById('massAllocBtn').style.display = 'flex';
+            if (data.role === 'admin') {
+                // Senha mestra: desbloqueia todas as unidades
+                S.units.forEach(u => { configActive[u.id] = true; });
+                showToast("ACESSO TOTAL LIBERADO — TODAS AS UNIDADES");
+            } else {
+                // Senha de unidade: desbloqueia apenas a unidade correspondente
+                const targetName = ROLE_UNIT_NAME[data.role];
+                const unit = S.units.find(u => u.name.toUpperCase() === targetName);
+                if (unit) {
+                    configActive[unit.id] = true;
+                    showToast(`EDIÇÃO LIBERADA: ${unit.name}`);
+                } else {
+                    showToast("UNIDADE NÃO ENCONTRADA PARA ESTA SENHA");
+                }
+            }
+            updateConfigUI();
             closeLock();
-            showToast("MODO DE CONFIGURAÇÃO HABILITADO");
             renderMain();
         } else {
             showToast("SENHA INCORRETA");
@@ -684,11 +714,8 @@ async function tryUnlock() {
 
 function exitConfigMode() {
     if(isMassMode) toggleMassMode();
-    configActive = false;
-    document.getElementById('cfgBadge').style.display = 'none';
-    document.getElementById('cfgToggleBtn').style.color = '';
-    document.getElementById('exitCfgBtn').style.display = 'none';
-    document.getElementById('massAllocBtn').style.display = 'none';
+    configActive = {};
+    updateConfigUI();
     closeConfig();
     showToast("MODO DE VISUALIZAÇÃO ATIVO (APENAS LEITURA)");
     renderMain();
@@ -935,6 +962,7 @@ function renderUnitSelect() { document.getElementById('unitSelect').innerHTML = 
 
 function changeUnit(id) {
     S.currentUnit=id;
+    updateConfigUI();
 
     if (isMassMode) {
         const sel = document.getElementById('massToolbarDoc');
