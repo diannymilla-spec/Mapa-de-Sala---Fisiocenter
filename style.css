@@ -70,7 +70,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 .side-label{width:50px;font-weight:800;font-size:9px;text-align:center;background:var(--s2);text-transform:uppercase}
 
-.cell-slot{height:85px;cursor:pointer;transition:0.1s;background:transparent; padding: 3px !important;}
+.cell-slot{height:95px;cursor:pointer;transition:0.1s;background:transparent; padding: 3px !important;}
 .cell-slot:hover{background:rgba(79, 142, 247, 0.05)}
 .cell-slot.drag-over{background:rgba(79, 142, 247, 0.2)}
 
@@ -90,7 +90,7 @@ body.light-theme .mini-slot.feriado { background-color: rgba(217, 119, 6, 0.25);
 .mini-name{font-weight:700;color:var(--text);display:block;line-height:1.15;letter-spacing:0.1px;margin-bottom:2px;white-space:nowrap;overflow:hidden;font-size:13px;}
 body.light-theme .mini-name { color: #162033; font-weight: 800; }
 
-.mini-spec { font-style: italic; font-size: 9px; color: var(--t2); display: block; line-height: 1.2; white-space: normal; overflow-wrap: break-word; word-break: break-word; overflow: hidden; width: 100%; text-align: center; }
+.mini-spec { font-style: italic; font-size: 7.5px; color: var(--t2); display: block; line-height: 1.25; white-space: normal; overflow-wrap: break-word; word-break: break-word; overflow: hidden; width: 100%; text-align: center; }
 body.light-theme .mini-spec { color: var(--t3); }
 
 .mini-tags { display: flex; flex-direction: column; gap: 3px; width: 100%; align-items: center;}
