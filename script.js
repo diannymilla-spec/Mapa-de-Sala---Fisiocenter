@@ -47,6 +47,12 @@ let massNature = 'Consulta';
 let massStatus = 'active';
 let massDiaInteiro = false;
 
+// Dashboard state
+let dashRange = 'month';
+let dashCustomStart = '';
+let dashCustomEnd = '';
+let dashGroupBy = 'week';
+
 let curTgl = {
     tglPrefix:'Dr.',
     tglType:'hora',
@@ -211,6 +217,7 @@ function goToToday() {
 }
 
 function navStep(dir) {
+  if(S.view === 'dashboard') return;
   if(S.view === 'week') {
     const d = parse(S.weekAnchor); d.setDate(d.getDate() + (dir * 7)); S.weekAnchor = fmt(monday(d));
   } else {
@@ -232,14 +239,19 @@ function renderNavLabel(){
 }
 
 function setView(v){
-    if (isMassMode && v === 'week') {
-        toggleMassMode();
-    }
-    S.view=v; renderNavLabel(); renderMain(); saveLocal();
+    if (isMassMode && v !== 'month') toggleMassMode();
+    S.view = v;
+    ['btnWeek','btnMonth','btnDash'].forEach(id => { const b=document.getElementById(id); if(b) b.classList.remove('active'); });
+    const activeId = v==='week'?'btnWeek':v==='month'?'btnMonth':'btnDash';
+    const ab = document.getElementById(activeId); if(ab) ab.classList.add('active');
+    const navGroup = document.getElementById('navGroup');
+    if(navGroup) navGroup.style.display = v==='dashboard' ? 'none' : '';
+    renderNavLabel(); renderMain(); saveLocal();
 }
 
 // RENDERIZAÇÃO
 function renderMain() {
+  if (S.view === 'dashboard') { renderDashboard(); return; }
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if(!unit) { el.innerHTML = "Unidade não encontrada."; return; }
@@ -612,7 +624,8 @@ function saveAllocation() {
   const doc    = S.doctors.find(d => d.id === docId);
   const nature = (doc && doc.defaultNature) ? doc.defaultNature : curTgl.tglAllocNature;
 
-  if(!docId && status !== 'feriado') { showToast("SELECIONE UM MÉDICO!"); return; }
+  const noDocNeeded = status === 'feriado' || status === 'manutencao';
+  if(!docId && !noDocNeeded) { showToast("SELECIONE UM MÉDICO!"); return; }
 
   const unit  = S.units.find(u => u.id === S.currentUnit);
   const parts = key.split('|');
@@ -634,6 +647,16 @@ function saveAllocation() {
           }
       });
       showToast(scope === 'diatodo' ? "DIA TODO MARCADO COMO FERIADO" : "TURNO MARCADO COMO FERIADO");
+  } else if (status === 'manutencao') {
+      const applyM = (k) => {
+          S.slots[k] = { status: 'manutencao', doctorId: null };
+          toSave[k] = S.slots[k];
+      };
+      applyM(key);
+      if(scope === 'diatodo') {
+          applyM(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
+      }
+      showToast(scope === 'diatodo' ? "DIA TODO MARCADO COMO MANUTENÇÃO" : "TURNO MARCADO COMO MANUTENÇÃO");
   } else {
       const apply = (k) => {
           S.slots[k] = { doctorId: docId, status, nature, obs };
@@ -1093,5 +1116,207 @@ function changeUnit(id) {
 }
 
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m.toUpperCase(); t.style.display='block'; setTimeout(()=>t.style.display='none', 2500); }
+
+// ── DASHBOARD ──────────────────────────────────────────────────────
+function setDashRange(v) { dashRange = v; renderDashboard(); }
+function setDashGroup(v) { dashGroupBy = v; renderDashboard(); }
+
+function renderDashboard() {
+    const el = document.getElementById('mainContent');
+    const unit = S.units.find(u => u.id === S.currentUnit);
+    if (!unit) { el.innerHTML = ''; return; }
+
+    // ── Intervalo de datas ──
+    const now = new Date();
+    let startDate, endDate;
+    if (dashRange === 'month') {
+        startDate = fmt(new Date(now.getFullYear(), now.getMonth(), 1));
+        endDate   = fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    } else if (dashRange === '3m') {
+        startDate = fmt(new Date(now.getFullYear(), now.getMonth() - 2, 1));
+        endDate   = fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    } else if (dashRange === '6m') {
+        startDate = fmt(new Date(now.getFullYear(), now.getMonth() - 5, 1));
+        endDate   = fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    } else {
+        startDate = dashCustomStart || fmt(new Date(now.getFullYear(), now.getMonth(), 1));
+        endDate   = dashCustomEnd   || fmt(now);
+    }
+
+    // ── Filtra slots da unidade e período ──
+    const entries = Object.entries(S.slots).filter(([key]) => {
+        const p = key.split('|');
+        return p[0] === S.currentUnit && p[2] >= startDate && p[2] <= endDate;
+    });
+
+    // ── KPIs ──
+    const realEntries = entries.filter(([,s]) => s.status !== 'feriado' && s.status !== 'manutencao');
+    const ativos      = realEntries.filter(([,s]) => s.status === 'active').length;
+    const cancelados  = realEntries.filter(([,s]) => s.status === 'canceled').length;
+    const total       = realEntries.length;
+    const taxaCancel  = total > 0 ? ((cancelados / total) * 100).toFixed(1) : '0.0';
+    const profIds     = new Set(realEntries.filter(([,s]) => s.doctorId).map(([,s]) => s.doctorId));
+
+    // ── Agrupamento por semana/mês ──
+    function wKey(dateStr) { return fmt(monday(parse(dateStr))); }
+    function mKey(dateStr) { return dateStr.slice(0, 7); }
+    const gKey = dashGroupBy === 'week' ? wKey : mKey;
+
+    function buildGroups(filterFn) {
+        const g = {};
+        entries.filter(([,s]) => filterFn(s)).forEach(([key]) => {
+            const k = gKey(key.split('|')[2]);
+            g[k] = (g[k] || 0) + 1;
+        });
+        return g;
+    }
+    const ativoGrp  = buildGroups(s => s.status === 'active');
+    const cancelGrp = buildGroups(s => s.status === 'canceled');
+    const allKeys   = [...new Set([...Object.keys(ativoGrp), ...Object.keys(cancelGrp)])].sort();
+
+    function periodLabel(k) {
+        if (dashGroupBy === 'week') {
+            const mon = parse(k);
+            const sat = new Date(mon); sat.setDate(mon.getDate() + 5);
+            return `${mon.getDate()}/${mon.getMonth()+1} — ${sat.getDate()}/${sat.getMonth()+1}`;
+        }
+        const [y, m] = k.split('-');
+        return `${MONTHS_PT[+m-1].slice(0,3)} ${y}`;
+    }
+
+    // ── Frequência dos profissionais ──
+    const profFreq = {};
+    realEntries.forEach(([,s]) => {
+        if (!s.doctorId) return;
+        if (!profFreq[s.doctorId]) profFreq[s.doctorId] = { active: 0, canceled: 0 };
+        if (s.status === 'active')   profFreq[s.doctorId].active++;
+        if (s.status === 'canceled') profFreq[s.doctorId].canceled++;
+    });
+    const sortedProfs  = Object.entries(profFreq).sort((a,b) => (b[1].active+b[1].canceled) - (a[1].active+a[1].canceled));
+    const maxProfTotal = sortedProfs.length > 0 ? sortedProfs[0][1].active + sortedProfs[0][1].canceled : 1;
+    const maxBar       = Math.max(1, ...Object.values(ativoGrp), ...Object.values(cancelGrp));
+    const maxCancel    = Math.max(1, ...Object.values(cancelGrp));
+
+    // ── Helpers de barra ──
+    const barHTML = (val, max, cls) => `
+        <div class="dash-bar-track"><div class="dash-bar-fill ${cls}" style="width:${Math.round((val/max)*100)}%"></div></div>`;
+
+    const emptyMsg = `<div class="dash-empty">Sem dados no período selecionado.</div>`;
+
+    // ── HTML ──
+    el.innerHTML = `
+    <div class="dash-wrap">
+
+      <!-- Filtros -->
+      <div class="dash-filters">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;white-space:nowrap;">Período:</span>
+          <div class="toggle-group" style="width:auto;gap:4px;">
+            <button class="tgl-btn ${dashRange==='month'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashRange('month')">Mês Atual</button>
+            <button class="tgl-btn ${dashRange==='3m'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashRange('3m')">3 Meses</button>
+            <button class="tgl-btn ${dashRange==='6m'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashRange('6m')">6 Meses</button>
+            <button class="tgl-btn ${dashRange==='custom'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashRange('custom')">Personalizado</button>
+          </div>
+          ${dashRange === 'custom' ? `
+            <input type="date" class="inp" value="${dashCustomStart}" onchange="dashCustomStart=this.value;renderDashboard()" style="width:140px;padding:5px 8px;font-size:11px;">
+            <span style="color:var(--t3);font-size:11px;">até</span>
+            <input type="date" class="inp" value="${dashCustomEnd}" onchange="dashCustomEnd=this.value;renderDashboard()" style="width:140px;padding:5px 8px;font-size:11px;">
+          ` : `<span style="font-size:10px;color:var(--t2);font-weight:700;">${startDate} → ${endDate}</span>`}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;white-space:nowrap;">Agrupar por:</span>
+          <div class="toggle-group" style="width:auto;gap:4px;">
+            <button class="tgl-btn ${dashGroupBy==='week'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashGroup('week')">Semana</button>
+            <button class="tgl-btn ${dashGroupBy==='month'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashGroup('month')">Mês</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="dash-kpis">
+        <div class="dash-kpi">
+          <div class="dash-kpi-val">${ativos}</div>
+          <div class="dash-kpi-label">Atendimentos Ativos</div>
+        </div>
+        <div class="dash-kpi dash-kpi--cancel">
+          <div class="dash-kpi-val">${cancelados}</div>
+          <div class="dash-kpi-label">Cancelamentos</div>
+        </div>
+        <div class="dash-kpi dash-kpi--prof">
+          <div class="dash-kpi-val">${profIds.size}</div>
+          <div class="dash-kpi-label">Profissionais Ativos</div>
+        </div>
+        <div class="dash-kpi dash-kpi--rate">
+          <div class="dash-kpi-val">${taxaCancel}%</div>
+          <div class="dash-kpi-label">Taxa de Cancelamento</div>
+        </div>
+      </div>
+
+      <!-- Gráficos de barras -->
+      <div class="dash-charts-row">
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">Atendimentos por ${dashGroupBy === 'week' ? 'Semana' : 'Mês'}</div>
+          <div class="dash-bars">
+            ${allKeys.length === 0 ? emptyMsg : allKeys.map(k => `
+              <div class="dash-bar-row">
+                <div class="dash-bar-label">${periodLabel(k)}</div>
+                ${barHTML(ativoGrp[k]||0, maxBar, 'dash-bar-active')}
+                <div class="dash-bar-val">${ativoGrp[k]||0}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">Cancelamentos por ${dashGroupBy === 'week' ? 'Semana' : 'Mês'}</div>
+          <div class="dash-bars">
+            ${allKeys.length === 0 ? emptyMsg : allKeys.map(k => `
+              <div class="dash-bar-row">
+                <div class="dash-bar-label">${periodLabel(k)}</div>
+                ${barHTML(cancelGrp[k]||0, maxCancel, 'dash-bar-cancel')}
+                <div class="dash-bar-val">${cancelGrp[k]||0}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela de profissionais -->
+      <div class="dash-prof-card">
+        <div class="dash-chart-title">Frequência dos Profissionais no Período</div>
+        ${sortedProfs.length === 0 ? emptyMsg : `
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th>Profissional</th>
+              <th>Especialidade</th>
+              <th style="text-align:right;">Ativos</th>
+              <th style="text-align:right;">Cancelados</th>
+              <th style="text-align:right;">Total</th>
+              <th style="text-align:right;">Taxa Canc.</th>
+              <th style="min-width:120px;">Frequência</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedProfs.map(([docId, c]) => {
+                const doc = S.doctors.find(d => d.id === docId);
+                if (!doc) return '';
+                const tot  = c.active + c.canceled;
+                const taxa = tot > 0 ? ((c.canceled / tot) * 100).toFixed(1) : '0.0';
+                const taxaColor = +taxa > 20 ? 'var(--cancel)' : +taxa > 10 ? 'var(--feriado)' : 'var(--active)';
+                const pct  = Math.round((tot / maxProfTotal) * 100);
+                return `<tr>
+                  <td style="font-weight:700;">${doc.name}</td>
+                  <td style="color:var(--t2);font-style:italic;">${doc.spec}</td>
+                  <td style="text-align:right;color:var(--active);font-weight:700;">${c.active}</td>
+                  <td style="text-align:right;color:var(--cancel);font-weight:700;">${c.canceled}</td>
+                  <td style="text-align:right;font-weight:900;">${tot}</td>
+                  <td style="text-align:right;font-weight:700;color:${taxaColor};">${taxa}%</td>
+                  <td><div class="dash-bar-track" style="height:8px;"><div class="dash-bar-fill dash-bar-active" style="width:${pct}%;height:8px;border-radius:2px;"></div></div></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`}
+      </div>
+
+    </div>`;
+}
 
 init();

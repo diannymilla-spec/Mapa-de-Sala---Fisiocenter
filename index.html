@@ -23,11 +23,12 @@
     <div class="view-switch">
         <button class="vs-btn active" id="btnWeek" onclick="setView('week')">Semana</button>
         <button class="vs-btn" id="btnMonth" onclick="setView('month')">Mês</button>
+        <button class="vs-btn" id="btnDash" onclick="setView('dashboard')">Dashboard</button>
     </div>
 
-    <div class="nav-group">
+    <div class="nav-group" id="navGroup">
       <button class="nav-btn" onclick="navStep(-1)">‹</button>
-      <button class="btn-today" onclick="goToToday()">Hoje</button>
+      <button class="btn-today" id="btnToday" onclick="goToToday()">Hoje</button>
       <div class="nav-label" id="navLabel">...</div>
       <button class="nav-btn" onclick="navStep(1)">›</button>
     </div>
@@ -98,6 +99,7 @@
           <button class="tgl-btn active" onclick="setTgl('tglAllocStatus', this, 'active')">Ativo</button>
           <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'canceled')">Cancelado</button>
           <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'feriado')">Feriado</button>
+          <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'manutencao')">🔧 Manutenção</button>
       </div>
     </div>
 
