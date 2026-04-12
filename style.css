@@ -84,13 +84,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 .mini-slot.active { background-color: rgba(62, 207, 142, 0.1); border: 1px solid rgba(62, 207, 142, 0.3); }
 .mini-slot.canceled { background-color: rgba(224, 92, 92, 0.1); border: 1px solid rgba(224, 92, 92, 0.3); }
 .mini-slot.feriado { background-color: rgba(217, 119, 6, 0.15); border: 1px solid rgba(217, 119, 6, 0.4); color: var(--feriado); font-weight: 800; letter-spacing: 1px;}
-.mini-slot.manutencao { background-color: rgba(129, 140, 248, 0.1); border: 1px solid rgba(129, 140, 248, 0.35); color: var(--type-hora); font-weight: 800; letter-spacing: 0.5px; font-size: 9px; }
+.mini-slot.manutencao { background-color: rgba(234, 179, 8, 0.15); border: 1px solid rgba(234, 179, 8, 0.5); color: #ca8a04; font-weight: 800; letter-spacing: 0.5px; font-size: 9px; }
 
 /* Cores Fortes (Tema Claro) */
 body.light-theme .mini-slot.active   { background-color: #bbf7d0; border: 1px solid #4ade80; }
 body.light-theme .mini-slot.canceled { background-color: #fecaca; border: 1px solid #f87171; }
 body.light-theme .mini-slot.feriado  { background-color: #fde68a; border: 1px solid #fbbf24; color: #92400e; }
-body.light-theme .mini-slot.manutencao { background-color: #e0e7ff; border: 1px solid #818cf8; color: #4338ca; }
+body.light-theme .mini-slot.manutencao { background-color: #fef08a; border: 1px solid #eab308; color: #854d0e; }
 
 .mini-name{font-weight:700;color:var(--text);display:block;line-height:1.15;letter-spacing:0.1px;margin-bottom:2px;white-space:nowrap;overflow:hidden;font-size:13px;}
 body.light-theme .mini-name { color: #162033; font-weight: 800; }
