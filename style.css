@@ -47,7 +47,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 @keyframes slideDown { from{ transform:translateY(-100%); opacity:0; } to{ transform:translateY(0); opacity:1; } }
 
 /* ── GRID DE CARDS ── */
-.content{padding:15px;flex:1;min-height:0;display:flex;flex-direction:column;}
+.content{padding:15px;flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;}
 .days-grid{display:grid;grid-template-columns:repeat(3, 1fr);gap:15px;flex:1;min-height:0;grid-auto-rows:1fr;}
 
 @media (max-width: 1200px) { .days-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -126,16 +126,23 @@ body.light-theme .mini-spec { color: var(--t3); }
 @media (max-width: 1000px) { .month-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 700px)  { .month-grid { grid-template-columns: repeat(2, 1fr); } }
 
-/* ── VISÃO EM MASSA (ULTRA COMPACTA) ── */
-.mass-grid { grid-template-columns: repeat(5, 1fr) !important; gap: 8px !important; }
-.mass-grid .cell-slot { height: auto !important; min-height: 28px; padding: 1px !important; }
-.mass-grid .cell-slot:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
-.mass-grid .mini-slot { padding: 1px !important; }
-.mass-grid .mini-name { font-size: 7.5px !important; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.mass-grid .day-card { min-height: 0 !important; }
-.mass-grid .room-th { font-size: 6px !important; padding: 2px 1px !important; }
-.mass-grid .side-label { width: 22px !important; font-size: 6px !important; }
-.mass-grid .day-header { padding: 4px; font-size: 9px; }
+/* ── VISÃO EM MASSA ── */
+.mass-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 10px !important;
+    grid-auto-rows: auto !important; /* altura natural, sem comprimir */
+    flex: none !important;           /* não estica para preencher viewport */
+}
+.mass-grid .day-card   { min-height: 0 !important; height: auto !important; }
+.mass-grid .day-table  { flex: none !important; height: auto !important; }
+.mass-grid .day-table tbody tr { height: auto !important; }
+.mass-grid .cell-slot  { height: 44px !important; min-height: 44px; padding: 2px !important; }
+.mass-grid .cell-slot:hover { outline: 2px solid var(--accent); outline-offset: -2px; background: transparent !important; }
+.mass-grid .mini-slot  { padding: 2px !important; border-radius: 3px !important; }
+.mass-grid .mini-name  { font-size: 8.5px !important; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.mass-grid .room-th    { font-size: 7px !important; padding: 4px 2px !important; }
+.mass-grid .side-label { width: 28px !important; font-size: 7px !important; }
+.mass-grid .day-header { padding: 6px 4px; font-size: 10px; letter-spacing: 0.5px; }
 
 @media (max-width: 600px) { .month-grid { grid-template-columns: 1fr; } .mass-grid { grid-template-columns: 1fr !important; } }
 
