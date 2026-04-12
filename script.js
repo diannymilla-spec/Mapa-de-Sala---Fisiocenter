@@ -142,9 +142,7 @@ async function init() {
             const p = JSON.parse(uiState);
             S.currentUnit = p.currentUnit || S.currentUnit;
             S.view        = p.view        || S.view;
-            S.weekAnchor  = p.weekAnchor  || null;
-            S.monthYear   = p.monthYear   || S.monthYear;
-            S.monthMonth  = p.monthMonth  !== undefined ? p.monthMonth : S.monthMonth;
+            // weekAnchor e mês NÃO são restaurados — sempre abre no dia atual
             S.theme       = p.theme;
         } catch(e) {}
     }
@@ -184,17 +182,14 @@ async function init() {
         document.body.classList.add('light-theme');
     }
 
-    if(!S.weekAnchor) {
-        goToToday();
-    } else {
-        // Garante que o anchor sempre seja uma Segunda-feira
-        const anchor = parse(S.weekAnchor);
-        if (anchor.getDay() !== 1) {
-            S.weekAnchor = fmt(monday(anchor));
-            saveLocal();
-        }
-    }
+    // Sempre abre na semana atual
+    const now = new Date();
+    S.weekAnchor = fmt(monday(now));
+    S.monthYear  = now.getFullYear();
+    S.monthMonth = now.getMonth();
+
     renderUnitSelect();
+    renderNavLabel();
     renderMain();
 }
 
