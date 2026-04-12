@@ -370,7 +370,10 @@ function slotHTML(slot, key, isMonthView) {
   if(slot.status === 'manutencao') {
       return `
       <div class="mini-slot manutencao" title="EM MANUTENÇÃO" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
-          ${isMonthView ? '🔧' : '🔧 MANUTENÇÃO'}
+          ${isMonthView
+              ? '<span style="font-size:11px;">⚠️</span>'
+              : '<span style="font-size:28px;line-height:1;">⚠️</span><span style="font-size:7px;font-weight:900;letter-spacing:0.5px;margin-top:2px;">MANUTENÇÃO</span>'
+          }
       </div>`;
   }
 
