@@ -126,25 +126,31 @@ body.light-theme .mini-spec { color: var(--t3); }
 @media (max-width: 1000px) { .month-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 700px)  { .month-grid { grid-template-columns: repeat(2, 1fr); } }
 
-/* ── VISÃO EM MASSA ── */
+/* ── VISÃO EM MASSA — mesma lógica compacta do month-grid, 5 colunas ── */
 .mass-grid {
     grid-template-columns: repeat(5, 1fr) !important;
-    gap: 10px !important;
-    grid-auto-rows: auto !important; /* altura natural, sem comprimir */
-    flex: none !important;           /* não estica para preencher viewport */
+    gap: 8px !important;
+    grid-auto-rows: auto !important;
+    flex: none !important;
 }
-.mass-grid .day-card   { min-height: 0 !important; height: auto !important; }
-.mass-grid .day-table  { flex: none !important; height: auto !important; }
+.mass-grid .day-card         { min-height: 0 !important; height: auto !important; }
+.mass-grid .day-table        { table-layout: auto !important; flex: none !important; height: auto !important; }
 .mass-grid .day-table tbody tr { height: auto !important; }
-.mass-grid .cell-slot  { height: 44px !important; min-height: 44px; padding: 2px !important; }
-.mass-grid .cell-slot:hover { outline: 2px solid var(--accent); outline-offset: -2px; background: transparent !important; }
-.mass-grid .mini-slot  { padding: 2px !important; border-radius: 3px !important; }
-.mass-grid .mini-name  { font-size: 8.5px !important; margin-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.mass-grid .room-th    { font-size: 7px !important; padding: 4px 2px !important; }
-.mass-grid .side-label { width: 28px !important; font-size: 7px !important; }
-.mass-grid .day-header { padding: 6px 4px; font-size: 10px; letter-spacing: 0.5px; }
+.mass-grid .day-table th,
+.mass-grid .day-table td     { padding: 0 !important; }
+.mass-grid .day-header       { padding: 4px 2px; font-size: 8px; letter-spacing: 0; }
+.mass-grid .room-th          { font-size: 6px !important; padding: 3px 1px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mass-grid .side-label       { width: 1px !important; white-space: nowrap; font-size: 6px !important; padding: 0 3px !important; }
+.mass-grid .cell-slot        { height: auto !important; min-height: 26px; padding: 0 !important; }
+.mass-grid .cell-slot:hover  { outline: 2px solid var(--accent); outline-offset: -2px; background: transparent !important; }
+.mass-grid .mini-slot        { padding: 1px 2px !important; gap: 0 !important; border-radius: 2px !important; justify-content: center !important; overflow: hidden !important; }
+.mass-grid .mini-name        { font-size: 8px !important; margin: 0 !important; white-space: nowrap !important; overflow: hidden !important; width: 100% !important; display: block !important; padding: 0 !important; line-height: 1.15 !important; }
+.mass-grid .mini-slot.feriado   { font-size: 6px; letter-spacing: 0; }
+.mass-grid .mini-slot.manutencao span { font-size: 14px !important; }
+.mass-grid .obs-icon         { font-size: 7px; top: 1px; left: 1px; }
 
-@media (max-width: 600px) { .month-grid { grid-template-columns: 1fr; } .mass-grid { grid-template-columns: 1fr !important; } }
+@media (max-width: 800px)  { .mass-grid { grid-template-columns: repeat(3, 1fr) !important; } }
+@media (max-width: 600px) { .month-grid { grid-template-columns: 1fr; } .mass-grid { grid-template-columns: repeat(2, 1fr) !important; } }
 
 /* ── MODALS ── */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center}
