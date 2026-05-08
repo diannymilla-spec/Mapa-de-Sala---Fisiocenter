@@ -95,12 +95,16 @@
 
     <div class="form-group">
       <label class="form-label">Status do Horário</label>
-      <div class="toggle-group" id="tglAllocStatus">
-          <button class="tgl-btn active" onclick="setTgl('tglAllocStatus', this, 'active')">Ativo</button>
-          <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'canceled')">Cancelado</button>
-          <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'feriado')">Feriado</button>
-          <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'manutencao')">🔧 Manutenção</button>
-          <button class="tgl-btn" onclick="setTgl('tglAllocStatus', this, 'diasuS')">🏥 Dia de SuS</button>
+      <div id="tglAllocStatus" style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;gap:6px;">
+              <button class="tgl-btn active" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'active')">Ativo</button>
+              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'feriado')">Feriado</button>
+          </div>
+          <div style="display:flex;gap:6px;">
+              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'canceled')">Cancelado</button>
+              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'diasuS')">🏥 Dia de SuS</button>
+              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'manutencao')">🔧 Manutenção</button>
+          </div>
       </div>
     </div>
 

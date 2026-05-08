@@ -292,9 +292,9 @@ function renderMain() {
     const dayName = DAYS_PT[dt.getDay()];
 
     const isDiaSuS = !!S.slots[`${unit.id}|diasuS|${date}|dia`];
-    const dayCardStyle = isToday ? 'border:2px solid var(--accent)' : (isDiaSuS ? 'border:2px solid var(--cancel);background:rgba(224,92,92,0.06)' : '');
+    const dayCardStyle = isToday ? 'border:2px solid var(--accent)' : '';
     h += `
-    <div class="day-card${isPrevMonth ? ' day-card--prev-month' : ''}" style="${dayCardStyle}">
+    <div class="day-card${isPrevMonth ? ' day-card--prev-month' : ''}${isDiaSuS ? ' diasuS' : ''}" style="${dayCardStyle}">
       <div class="day-header">${dayName} ${dt.getDate()}/${dt.getMonth()+1}</div>
       <table class="day-table">
         <thead>
