@@ -223,7 +223,7 @@ body.light-theme .mini-spec { color: var(--t3); }
 @media(max-width:900px){.dash-kpis{grid-template-columns:repeat(2,1fr);}  .dash-charts-row{grid-template-columns:1fr;}}
 
 /* ── DIA DE SUS ── */
-.day-card.diasuS { border: 2px solid #ca8a04; background: #fef9c3; }
+.day-card.diasuS { border: 2px solid #ca8a04; background: var(--s1); }
 .day-card.diasuS .day-header { background: #fde047; color: #713f12; border-bottom-color: rgba(202,138,4,0.4); }
 .day-card.diasuS .side-label { background: #fde047; color: #854d0e; }
 .day-card.diasuS .room-color-0,
@@ -231,6 +231,5 @@ body.light-theme .mini-spec { color: var(--t3); }
 .day-card.diasuS .room-color-2,
 .day-card.diasuS .room-color-3,
 .day-card.diasuS .room-color-4 { background: rgba(253,224,71,0.75) !important; color: #713f12 !important; }
-body.light-theme .day-card.diasuS { border-color: #ca8a04; background: #fef08a; }
-body.light-theme .day-card.diasuS .day-header { background: #fde047; color: #713f12; }
-body.light-theme .day-card.diasuS .side-label { background: #fde047; }
+.day-card.diasuS .cell-slot { background: rgba(254,240,138,0.45) !important; }
+.day-card.diasuS .cell-slot:has(.mini-slot) { background: transparent !important; }
