@@ -291,8 +291,10 @@ function renderMain() {
     const isToday = fmt(new Date()) === date;
     const dayName = DAYS_PT[dt.getDay()];
 
+    const isDiaSuS = !!S.slots[`${unit.id}|diasuS|${date}|dia`];
+    const dayCardStyle = isToday ? 'border:2px solid var(--accent)' : (isDiaSuS ? 'border:2px solid var(--cancel);background:rgba(224,92,92,0.06)' : '');
     h += `
-    <div class="day-card${isPrevMonth ? ' day-card--prev-month' : ''}" style="${isToday ? 'border:2px solid var(--accent)' : ''}">
+    <div class="day-card${isPrevMonth ? ' day-card--prev-month' : ''}" style="${dayCardStyle}">
       <div class="day-header">${dayName} ${dt.getDate()}/${dt.getMonth()+1}</div>
       <table class="day-table">
         <thead>
@@ -604,9 +606,10 @@ function openAlloc(key) {
 
   sel.innerHTML = `<option value="">Médico...</option>` + sortedDocs.map(d => `<option value="${d.id}" ${slot?.doctorId === d.id ? 'selected' : ''}>${d.name}</option>`).join('');
 
-  document.getElementById('btnDelAlloc').style.display = slot ? 'block' : 'none';
+  const diasuSKey = `${parts0[0]}|diasuS|${date0}|dia`;
+  document.getElementById('btnDelAlloc').style.display = (slot || !!S.slots[diasuSKey]) ? 'block' : 'none';
 
-  const st = slot ? slot.status : 'active';
+  const st = S.slots[diasuSKey] ? 'diasuS' : (slot ? slot.status : 'active');
   const nt = slot ? (slot.nature || 'Consulta') : 'Consulta';
 
   setTgl('tglAllocStatus', document.querySelector(`#tglAllocStatus .tgl-btn[onclick*="'${st}'"]`), st);
@@ -627,7 +630,7 @@ function saveAllocation() {
   const doc    = S.doctors.find(d => d.id === docId);
   const nature = (doc && doc.defaultNature) ? doc.defaultNature : curTgl.tglAllocNature;
 
-  const noDocNeeded = status === 'feriado' || status === 'manutencao';
+  const noDocNeeded = status === 'feriado' || status === 'manutencao' || status === 'diasuS';
   if(!docId && !noDocNeeded) { showToast("SELECIONE UM MÉDICO!"); return; }
 
   const unit  = S.units.find(u => u.id === S.currentUnit);
@@ -660,6 +663,11 @@ function saveAllocation() {
           applyM(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
       }
       showToast(scope === 'diatodo' ? "DIA TODO MARCADO COMO MANUTENÇÃO" : "TURNO MARCADO COMO MANUTENÇÃO");
+  } else if (status === 'diasuS') {
+      const diasuSKey = `${parts[0]}|diasuS|${date}|dia`;
+      S.slots[diasuSKey] = { status: 'diasuS', doctorId: null };
+      toSave[diasuSKey] = S.slots[diasuSKey];
+      showToast("DIA MARCADO COMO DIA DE SUS");
   } else {
       const apply = (k) => {
           S.slots[k] = { doctorId: docId, status, nature, obs };
@@ -710,6 +718,11 @@ function deleteAllocation() {
         showToast("ALOCAÇÃO REMOVIDA!");
     }
 
+    const diasuSDelKey = `${unitId}|diasuS|${date}|dia`;
+    if (S.slots[diasuSDelKey]) {
+        delete S.slots[diasuSDelKey];
+        keysToDelete.push(diasuSDelKey);
+    }
     removeSlots(keysToDelete);
     closeAlloc(); renderMain();
 }
@@ -1153,7 +1166,7 @@ function renderDashboard() {
     });
 
     // ── KPIs ──
-    const realEntries = entries.filter(([,s]) => s.status !== 'feriado' && s.status !== 'manutencao');
+    const realEntries = entries.filter(([,s]) => s.status !== 'feriado' && s.status !== 'manutencao' && s.status !== 'diasuS');
     const ativos      = realEntries.filter(([,s]) => s.status === 'active').length;
     const cancelados  = realEntries.filter(([,s]) => s.status === 'canceled').length;
     const total       = realEntries.length;
