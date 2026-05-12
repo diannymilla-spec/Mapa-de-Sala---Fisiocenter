@@ -624,9 +624,11 @@ function closeAlloc() { document.getElementById('allocModal').classList.remove('
 
 // BUSCA DE MÉDICO
 let searchSelectedDocId = null;
+let searchFromMonth = '';
 
 function openSearch() {
     searchSelectedDocId = null;
+    searchFromMonth = new Date().toISOString().slice(0, 7);
     document.getElementById('searchPanel').classList.add('open');
     document.getElementById('searchInp').value = '';
     filterDoctors('');
@@ -640,16 +642,25 @@ function closeSearch() {
 function filterDoctors(query) {
     const unitDocs = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived);
     const q = query.trim().toLowerCase();
-    const filtered = q ? unitDocs.filter(d => d.name.toLowerCase().includes(q)) : unitDocs;
+    const body = document.getElementById('searchBody');
+
+    if (!q && !searchSelectedDocId) {
+        body.innerHTML = `<div style="color:var(--t3);font-size:11px;padding:24px;text-align:center;">Digite para buscar por nome ou especialidade.</div>`;
+        return;
+    }
+
+    const filtered = q
+        ? unitDocs.filter(d => d.name.toLowerCase().includes(q) || (d.spec || '').toLowerCase().includes(q))
+        : unitDocs.filter(d => d.id === searchSelectedDocId);
+
     const sorted = [...filtered].sort((a, b) => {
         const nA = a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').trim();
         const nB = b.name.replace(/^(Dr\.|Dra\.)\s+/i, '').trim();
         return nA.localeCompare(nB);
     });
 
-    const body = document.getElementById('searchBody');
     if (!sorted.length) {
-        body.innerHTML = `<div style="color:var(--t3);font-size:11px;padding:24px;text-align:center;">Nenhum médico encontrado.</div>`;
+        body.innerHTML = `<div style="color:var(--t3);font-size:11px;padding:24px;text-align:center;">Nenhum profissional encontrado.</div>`;
         return;
     }
 
@@ -678,14 +689,12 @@ function renderDoctorSchedule(docId) {
     const doc = S.doctors.find(d => d.id === docId);
     if (!doc) return '';
 
-    const entries = Object.entries(S.slots).filter(([key, slot]) => {
+    const allEntries = Object.entries(S.slots).filter(([key, slot]) => {
         const p = key.split('|');
         return p[0] === S.currentUnit && slot.doctorId === docId;
     });
 
-    if (!entries.length) {
-        return `<div style="color:var(--t3);font-size:11px;padding:16px;text-align:center;border-top:1px solid var(--border);">Nenhum atendimento encontrado para ${doc.name}.</div>`;
-    }
+    const entries = allEntries.filter(([key]) => key.split('|')[2].slice(0, 7) >= searchFromMonth);
 
     entries.sort(([kA], [kB]) => {
         const pA = kA.split('|'), pB = kB.split('|');
@@ -704,38 +713,48 @@ function renderDoctorSchedule(docId) {
     });
 
     let html = `<div style="border-top:1px solid var(--border);padding-top:14px;">
-        <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Agenda — ${doc.name}</div>`;
+        <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Agenda — ${doc.name}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 10px;background:var(--s3);border-radius:var(--r);border:1px solid var(--border);">
+            <span style="font-size:9px;font-weight:800;color:var(--t3);text-transform:uppercase;white-space:nowrap;">A partir de:</span>
+            <input type="month" value="${searchFromMonth}"
+                   style="background:var(--s4);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);font-size:11px;flex:1;font-family:inherit;outline:none;"
+                   onchange="searchFromMonth=this.value; filterDoctors(document.getElementById('searchInp').value)">
+        </div>`;
 
-    Object.entries(byMonth).sort(([a],[b]) => a.localeCompare(b)).forEach(([monthKey, items]) => {
-        const [yr, mo] = monthKey.split('-');
-        html += `<div style="font-size:9px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">${MONTHS_PT[+mo-1]} ${yr}</div>`;
+    if (!entries.length) {
+        html += `<div style="color:var(--t3);font-size:11px;padding:12px;text-align:center;">Nenhum atendimento no período selecionado.</div>`;
+    } else {
+        Object.entries(byMonth).sort(([a],[b]) => a.localeCompare(b)).forEach(([monthKey, items]) => {
+            const [yr, mo] = monthKey.split('-');
+            html += `<div style="font-size:9px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">${MONTHS_PT[+mo-1]} ${yr}</div>`;
 
-        items.forEach(({ slot, date, period, room }) => {
-            const dt = parse(date);
-            const dayName = DAYS_PT[dt.getDay()];
-            const dayNum = `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
-            const periodLabel = period === 'manha' ? 'Manhã' : 'Tarde';
-            const statusLabel = slot.status === 'canceled' ? 'Cancelado' : 'Ativo';
-            const statusColor = slot.status === 'canceled' ? 'var(--cancel)' : 'var(--active)';
-            const natLabel = slot.nature || doc.nature || 'Consulta';
-            const roomName = room ? room.name : '—';
+            items.forEach(({ slot, date, period, room }) => {
+                const dt = parse(date);
+                const dayName = DAYS_PT[dt.getDay()];
+                const dayNum = `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+                const periodLabel = period === 'manha' ? 'Manhã' : 'Tarde';
+                const statusLabel = slot.status === 'canceled' ? 'Cancelado' : 'Ativo';
+                const statusColor = slot.status === 'canceled' ? 'var(--cancel)' : 'var(--active)';
+                const natLabel = slot.nature || doc.nature || 'Consulta';
+                const roomName = room ? room.name : '—';
 
-            html += `
-            <div class="search-sched-item ${slot.status}" onclick="navigateToDate('${date}')">
-                <div style="font-weight:700;font-size:11px;color:var(--text);">${dayName}, ${dayNum}</div>
-                <div style="display:flex;gap:6px;margin-top:3px;align-items:center;flex-wrap:wrap;">
-                    <span style="font-size:9px;color:var(--t2);">${periodLabel}</span>
-                    <span style="font-size:8px;color:var(--t3);">·</span>
-                    <span style="font-size:9px;color:var(--t2);">${roomName}</span>
-                    <span style="font-size:8px;color:var(--t3);">·</span>
-                    <span style="font-size:9px;font-weight:700;color:${statusColor};">${statusLabel}</span>
-                    <span style="font-size:8px;color:var(--t3);">·</span>
-                    <span style="font-size:9px;color:var(--t2);">${natLabel}</span>
-                </div>
-            </div>`;
+                html += `
+                <div class="search-sched-item ${slot.status}" onclick="navigateToDate('${date}')">
+                    <div style="font-weight:700;font-size:11px;color:var(--text);">${dayName}, ${dayNum}</div>
+                    <div style="display:flex;gap:6px;margin-top:3px;align-items:center;flex-wrap:wrap;">
+                        <span style="font-size:9px;color:var(--t2);">${periodLabel}</span>
+                        <span style="font-size:8px;color:var(--t3);">·</span>
+                        <span style="font-size:9px;color:var(--t2);">${roomName}</span>
+                        <span style="font-size:8px;color:var(--t3);">·</span>
+                        <span style="font-size:9px;font-weight:700;color:${statusColor};">${statusLabel}</span>
+                        <span style="font-size:8px;color:var(--t3);">·</span>
+                        <span style="font-size:9px;color:var(--t2);">${natLabel}</span>
+                    </div>
+                </div>`;
+            });
+            html += `<div style="margin-bottom:10px;"></div>`;
         });
-        html += `<div style="margin-bottom:10px;"></div>`;
-    });
+    }
 
     html += `</div>`;
     return html;
