@@ -69,6 +69,7 @@ document.addEventListener('input', function(e) {
         const end = e.target.selectionEnd;
         let val = e.target.value;
 
+        if (e.target.id === 'searchInp') return;
         if (e.target.id === 'allocObs' || e.target.id === 'newUnitInp' || e.target.id === 'newRoomInp' || e.target.id.startsWith('edit-u-') || e.target.id.startsWith('edit-r-')) {
             e.target.value = val.toUpperCase();
         } else {
@@ -620,6 +621,131 @@ function openAlloc(key) {
 }
 
 function closeAlloc() { document.getElementById('allocModal').classList.remove('open'); }
+
+// BUSCA DE MÉDICO
+let searchSelectedDocId = null;
+
+function openSearch() {
+    searchSelectedDocId = null;
+    document.getElementById('searchPanel').classList.add('open');
+    document.getElementById('searchInp').value = '';
+    filterDoctors('');
+    setTimeout(() => document.getElementById('searchInp').focus(), 100);
+}
+
+function closeSearch() {
+    document.getElementById('searchPanel').classList.remove('open');
+}
+
+function filterDoctors(query) {
+    const unitDocs = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived);
+    const q = query.trim().toLowerCase();
+    const filtered = q ? unitDocs.filter(d => d.name.toLowerCase().includes(q)) : unitDocs;
+    const sorted = [...filtered].sort((a, b) => {
+        const nA = a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').trim();
+        const nB = b.name.replace(/^(Dr\.|Dra\.)\s+/i, '').trim();
+        return nA.localeCompare(nB);
+    });
+
+    const body = document.getElementById('searchBody');
+    if (!sorted.length) {
+        body.innerHTML = `<div style="color:var(--t3);font-size:11px;padding:24px;text-align:center;">Nenhum médico encontrado.</div>`;
+        return;
+    }
+
+    let html = `<div style="margin-bottom:${searchSelectedDocId ? '12px' : '0'};">`;
+    sorted.forEach(doc => {
+        const sel = doc.id === searchSelectedDocId;
+        html += `
+        <div class="search-doc-item${sel ? ' selected' : ''}" onclick="selectDoctor('${doc.id}')">
+            <div style="font-weight:700;font-size:12px;color:var(--text);">${doc.name}</div>
+            <div style="font-size:10px;color:var(--t2);margin-top:2px;">${doc.spec || ''}</div>
+        </div>`;
+    });
+    html += `</div>`;
+
+    if (searchSelectedDocId) html += renderDoctorSchedule(searchSelectedDocId);
+
+    body.innerHTML = html;
+}
+
+function selectDoctor(docId) {
+    searchSelectedDocId = docId;
+    filterDoctors(document.getElementById('searchInp').value);
+}
+
+function renderDoctorSchedule(docId) {
+    const doc = S.doctors.find(d => d.id === docId);
+    if (!doc) return '';
+
+    const entries = Object.entries(S.slots).filter(([key, slot]) => {
+        const p = key.split('|');
+        return p[0] === S.currentUnit && slot.doctorId === docId;
+    });
+
+    if (!entries.length) {
+        return `<div style="color:var(--t3);font-size:11px;padding:16px;text-align:center;border-top:1px solid var(--border);">Nenhum atendimento encontrado para ${doc.name}.</div>`;
+    }
+
+    entries.sort(([kA], [kB]) => {
+        const pA = kA.split('|'), pB = kB.split('|');
+        const dc = pA[2].localeCompare(pB[2]);
+        return dc !== 0 ? dc : (pA[3] === 'manha' ? -1 : 1);
+    });
+
+    const byMonth = {};
+    entries.forEach(([key, slot]) => {
+        const p = key.split('|');
+        const date = p[2], period = p[3], monthKey = date.slice(0, 7);
+        if (!byMonth[monthKey]) byMonth[monthKey] = [];
+        const unit = S.units.find(u => u.id === S.currentUnit);
+        const room = unit?.rooms.find(r => r.id === p[1]);
+        byMonth[monthKey].push({ slot, date, period, room });
+    });
+
+    let html = `<div style="border-top:1px solid var(--border);padding-top:14px;">
+        <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Agenda — ${doc.name}</div>`;
+
+    Object.entries(byMonth).sort(([a],[b]) => a.localeCompare(b)).forEach(([monthKey, items]) => {
+        const [yr, mo] = monthKey.split('-');
+        html += `<div style="font-size:9px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">${MONTHS_PT[+mo-1]} ${yr}</div>`;
+
+        items.forEach(({ slot, date, period, room }) => {
+            const dt = parse(date);
+            const dayName = DAYS_PT[dt.getDay()];
+            const dayNum = `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+            const periodLabel = period === 'manha' ? 'Manhã' : 'Tarde';
+            const statusLabel = slot.status === 'canceled' ? 'Cancelado' : 'Ativo';
+            const statusColor = slot.status === 'canceled' ? 'var(--cancel)' : 'var(--active)';
+            const natLabel = slot.nature || doc.nature || 'Consulta';
+            const roomName = room ? room.name : '—';
+
+            html += `
+            <div class="search-sched-item ${slot.status}" onclick="navigateToDate('${date}')">
+                <div style="font-weight:700;font-size:11px;color:var(--text);">${dayName}, ${dayNum}</div>
+                <div style="display:flex;gap:6px;margin-top:3px;align-items:center;flex-wrap:wrap;">
+                    <span style="font-size:9px;color:var(--t2);">${periodLabel}</span>
+                    <span style="font-size:8px;color:var(--t3);">·</span>
+                    <span style="font-size:9px;color:var(--t2);">${roomName}</span>
+                    <span style="font-size:8px;color:var(--t3);">·</span>
+                    <span style="font-size:9px;font-weight:700;color:${statusColor};">${statusLabel}</span>
+                    <span style="font-size:8px;color:var(--t3);">·</span>
+                    <span style="font-size:9px;color:var(--t2);">${natLabel}</span>
+                </div>
+            </div>`;
+        });
+        html += `<div style="margin-bottom:10px;"></div>`;
+    });
+
+    html += `</div>`;
+    return html;
+}
+
+function navigateToDate(date) {
+    closeSearch();
+    S.weekAnchor = fmt(monday(parse(date)));
+    setView('week');
+}
 
 function saveAllocation() {
   const key    = document.getElementById('allocKey').value;

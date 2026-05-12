@@ -222,6 +222,15 @@ body.light-theme .mini-spec { color: var(--t3); }
 
 @media(max-width:900px){.dash-kpis{grid-template-columns:repeat(2,1fr);}  .dash-charts-row{grid-template-columns:1fr;}}
 
+/* ── SEARCH PANEL ── */
+.search-doc-item { padding: 10px 12px; border-radius: var(--r); cursor: pointer; border: 1px solid var(--border); background: var(--s3); margin-bottom: 6px; transition: 0.15s; }
+.search-doc-item:hover { background: var(--s4); border-color: var(--accent); }
+.search-doc-item.selected { border-color: var(--accent); background: rgba(79,142,247,0.1); }
+.search-sched-item { padding: 9px 12px; border-radius: 4px; cursor: pointer; margin-bottom: 4px; border-left: 3px solid transparent; background: var(--s3); transition: 0.15s; }
+.search-sched-item:hover { background: var(--s4); }
+.search-sched-item.active { border-left-color: var(--active); }
+.search-sched-item.canceled { border-left-color: var(--cancel); }
+
 /* ── DIA DE SUS ── */
 .day-card.diasuS { border: 2px solid #ca8a04; background: var(--s1); }
 .day-card.diasuS .day-header { background: #fde047; color: #713f12; border-bottom-color: rgba(202,138,4,0.4); }

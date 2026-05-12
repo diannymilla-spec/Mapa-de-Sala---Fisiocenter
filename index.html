@@ -33,6 +33,7 @@
       <button class="nav-btn" onclick="navStep(1)">›</button>
     </div>
 
+    <button class="nav-btn" onclick="openSearch()" title="Buscar Médico" style="font-size:16px">🔍</button>
     <button class="nav-btn" id="cfgToggleBtn" onclick="handleConfigTrigger()" style="font-size:18px">⚙</button>
   </div>
 </div>
@@ -140,6 +141,18 @@
       <button class="btn btn-primary" style="flex:1" onclick="tryUnlock()">Entrar</button>
     </div>
   </div>
+</div>
+
+<!-- SEARCH DRAWER -->
+<div class="cfg-panel" id="searchPanel">
+  <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--s2)">
+    <h3 style="font-family:'Fraunces'">🔍 Buscar Médico</h3>
+    <button class="btn" style="padding:5px 10px" onclick="closeSearch()">✕</button>
+  </div>
+  <div style="padding:12px 15px; border-bottom:1px solid var(--border); background:var(--s2)">
+    <input class="inp" id="searchInp" type="text" placeholder="Digite o nome do médico..." oninput="filterDoctors(this.value)" autocomplete="off">
+  </div>
+  <div class="cfg-body" id="searchBody"></div>
 </div>
 
 <!-- CONFIG DRAWER -->
