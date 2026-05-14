@@ -221,13 +221,23 @@ function fmtPrice(val) {
     return 'R$' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+let _priceSearch = '';
+
 function renderPriceTable() {
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if (!unit) { el.innerHTML = ''; return; }
 
   const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
-  const doctors = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived).sort(sortByName);
+  const q = _priceSearch.toLowerCase().trim();
+  const doctors = S.doctors.filter(d => {
+    if (d.unitId !== S.currentUnit || d.archived) return false;
+    if (!q) return true;
+    return d.name.toLowerCase().includes(q)
+        || d.spec.toLowerCase().includes(q)
+        || (d.priceParticular && fmtPrice(d.priceParticular).toLowerCase().includes(q))
+        || (d.priceCartao     && fmtPrice(d.priceCartao).toLowerCase().includes(q));
+  }).sort(sortByName);
 
   const rows = doctors.map(d => {
     const nature = d.defaultNature || '—';
@@ -254,7 +264,14 @@ function renderPriceTable() {
       <h2 style="font-family:'Fraunces';font-size:18px;color:var(--accent);">Tabela de Preços</h2>
       <span style="font-size:11px;color:var(--t3);">${unit.name}</span>
     </div>
-    <p style="font-size:11px;color:var(--t3);margin-bottom:18px;">Valores de consulta por profissional. Clique em ✎ para editar qualquer linha.</p>
+    <div style="margin-bottom:16px;">
+      <input class="inp" id="priceSearchInp" type="text" value="${_priceSearch.replace(/"/g,'&quot;')}"
+             placeholder="Buscar por profissional, especialidade ou valor..."
+             oninput="_priceSearch=this.value; renderPriceTable();"
+             style="width:100%;max-width:420px;padding:8px 12px;">
+      ${q && !doctors.length ? `<div style="margin-top:8px;font-size:11px;color:var(--t3);">Nenhum resultado para "<strong>${q}</strong>"</div>` : ''}
+      ${q && doctors.length ? `<div style="margin-top:8px;font-size:11px;color:var(--t3);">${doctors.length} resultado${doctors.length>1?'s':''} encontrado${doctors.length>1?'s':''}</div>` : ''}
+    </div>
     <div style="overflow-x:auto;border-radius:var(--r);border:1px solid var(--border);">
       <table class="dash-table" style="font-size:12px;width:100%;">
         <thead>
@@ -271,6 +288,11 @@ function renderPriceTable() {
       </table>
     </div>
   </div>`;
+
+  if (_priceSearch) {
+    const inp = document.getElementById('priceSearchInp');
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  }
 }
 
 function editPriceRow(id) {
@@ -448,6 +470,7 @@ function renderNavLabel(){
 
 function setView(v){
     if (isMassMode && v !== 'month') toggleMassMode();
+    if (v !== 'priceTable') _priceSearch = '';
     S.view = v;
     ['btnWeek','btnMonth','btnDash','btnPriceTable'].forEach(id => { const b=document.getElementById(id); if(b) b.classList.remove('active'); });
     const activeId = v==='week'?'btnWeek':v==='month'?'btnMonth':v==='priceTable'?'btnPriceTable':'btnDash';
