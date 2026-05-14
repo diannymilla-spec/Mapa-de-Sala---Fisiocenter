@@ -222,6 +222,69 @@ body.light-theme .mini-spec { color: var(--t3); }
 
 @media(max-width:900px){.dash-kpis{grid-template-columns:repeat(2,1fr);}  .dash-charts-row{grid-template-columns:1fr;}}
 
+/* ── MOBILE ── */
+@media (max-width: 640px) {
+  html { overflow-x: hidden; }
+
+  /* Topbar: 2 linhas no mobile para não causar overflow horizontal */
+  .topbar {
+    height: auto;
+    min-height: 44px;
+    padding: 6px 10px;
+    flex-wrap: wrap;
+    row-gap: 4px;
+    gap: 8px;
+  }
+
+  /* Linha 1: logo + unidade (logo encolhe) */
+  .logo { font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .unit-select { font-size: 11px; padding: 4px 8px; }
+
+  /* Linha 2: todos os botões da direita, scroll horizontal se necessário */
+  .tb-right {
+    order: 10;
+    width: 100%;
+    gap: 5px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tb-right::-webkit-scrollbar { display: none; }
+
+  /* Botões de view menores */
+  .vs-btn { padding: 4px 7px; font-size: 9px; white-space: nowrap; }
+
+  /* Nav label mais curto */
+  .nav-label { min-width: 80px; font-size: 9px; }
+
+  /* Botão Buscar: só ícone */
+  .mass-btn span { display: none; }
+
+  /* Conteúdo */
+  .content { padding: 8px; }
+
+  /* Semana: células mais altas para toque */
+  .cell-slot { min-height: 52px !important; }
+  .mini-name { font-size: 14px !important; }
+
+  /* Mês: 2 colunas no mobile */
+  .month-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Dashboard */
+  .dash-kpis { grid-template-columns: repeat(2, 1fr) !important; }
+  .dash-charts-row { grid-template-columns: 1fr !important; }
+  .dash-bar-row { grid-template-columns: 70px 1fr 30px; }
+
+  /* Modal: ocupa mais a tela */
+  .modal-card { margin: 8px; max-width: none; width: calc(100% - 16px); }
+
+  /* Toast: centralizado na base */
+  .toast { right: 12px; left: 12px; bottom: 12px; text-align: center; }
+
+  /* Config drawer: largura total */
+  .cfg-panel { width: 100%; max-width: 100vw; }
+}
+
 /* ── SEARCH PANEL ── */
 .search-doc-item { padding: 10px 12px; border-radius: var(--r); cursor: pointer; border: 1px solid var(--border); background: var(--s3); margin-bottom: 6px; transition: 0.15s; }
 .search-doc-item:hover { background: var(--s4); border-color: var(--accent); }
@@ -274,9 +337,13 @@ body.light-theme .mini-spec { color: var(--t3); }
 }
 .doc-name-tip {
     cursor: pointer;
-    display: contents;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    pointer-events: auto !important;
 }
 .doc-name-tip:hover .mini-name,
 .doc-name-tip:hover .mini-spec {
-    text-decoration: underline dotted rgba(255,255,255,0.4);
+    opacity: 0.75;
 }
