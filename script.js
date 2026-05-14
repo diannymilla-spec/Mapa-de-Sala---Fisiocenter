@@ -243,7 +243,7 @@ function renderPriceTable() {
       <td id="price-pp-${d.id}" style="padding:10px 12px;font-weight:700;color:${ppColor};">${pp}</td>
       <td id="price-pc-${d.id}" style="padding:10px 12px;font-weight:700;color:${pcColor};">${pc}</td>
       <td style="padding:6px 12px;text-align:right;">
-        <button class="btn btn-edit" style="padding:5px 10px;" onclick="editPriceRow('${d.id}')">✎</button>
+        ${isEditActive(S.currentUnit) ? `<button class="btn btn-edit" style="padding:5px 10px;" onclick="editPriceRow('${d.id}')">✎</button>` : ''}
       </td>
     </tr>`;
   }).join('');
