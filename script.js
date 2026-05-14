@@ -433,18 +433,17 @@ function renderNavLabel(){
 function setView(v){
     if (isMassMode && v !== 'month') toggleMassMode();
     S.view = v;
-    ['btnWeek','btnMonth','btnDash','btnPriceTable'].forEach(id => { const b=document.getElementById(id); if(b) b.classList.remove('active'); });
-    const activeId = v==='week'?'btnWeek':v==='month'?'btnMonth':v==='priceTable'?'btnPriceTable':'btnDash';
+    ['btnWeek','btnMonth','btnDash'].forEach(id => { const b=document.getElementById(id); if(b) b.classList.remove('active'); });
+    const activeId = v==='week'?'btnWeek':v==='month'?'btnMonth':'btnDash';
     const ab = document.getElementById(activeId); if(ab) ab.classList.add('active');
     const navGroup = document.getElementById('navGroup');
-    if(navGroup) navGroup.style.display = (v==='dashboard' || v==='priceTable') ? 'none' : '';
+    if(navGroup) navGroup.style.display = v==='dashboard' ? 'none' : '';
     renderNavLabel(); renderMain(); saveLocal();
 }
 
 // RENDERIZAÇÃO
 function renderMain() {
   if (S.view === 'dashboard') { renderDashboard(); return; }
-  if (S.view === 'priceTable') { renderPriceTable(); return; }
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if(!unit) { el.innerHTML = "Unidade não encontrada."; return; }
@@ -1185,15 +1184,8 @@ function renderCfgBody(tab) {
         const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
         const activeDocs   = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived).sort(sortByName);
         const archivedDocs = S.doctors.filter(d => d.unitId === S.currentUnit && d.archived).sort(sortByName);
-        const syncStatusHtml = lastSyncTime
-            ? `<div style="font-size:9px;color:var(--t3);text-align:center;margin-top:4px;">Última sync: ${new Date(lastSyncTime).toLocaleString('pt-BR')}</div>`
-            : '';
         body.innerHTML = `
-            <button class="btn btn-primary" style="width:100%;margin-bottom:4px;" onclick="syncRealClinicData()" ${syncInProgress ? 'disabled' : ''}>
-                ${syncInProgress ? '⏳ SINCRONIZANDO...' : '🔄 SINCRONIZAR COM REALCLINIC'}
-            </button>
-            ${syncStatusHtml}
-            <div class="form-group" style="margin-bottom:15px;margin-top:12px;">
+            <div class="form-group" style="margin-bottom:15px;">
                 <label class="form-label" style="font-size:11px; text-transform:none; letter-spacing:0;">
                     Adicionando médicos na unidade: <strong style="color:var(--accent); text-transform:uppercase;">${unit.name}</strong>
                 </label>
