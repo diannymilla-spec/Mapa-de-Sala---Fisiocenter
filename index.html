@@ -50,8 +50,9 @@
         <div style="width:1px; height:20px; background:var(--border);"></div>
 
         <label style="font-size:10px; font-weight:bold; color:var(--t3);">NATUREZA</label>
-        <div class="toggle-group" id="tglMassToolbarNature" style="width: 180px;">
+        <div class="toggle-group" id="tglMassToolbarNature" style="width: 260px;">
           <button class="tgl-btn active" style="padding:6px;" onclick="setTgl('tglMassToolbarNature', this, 'Consulta'); massNature='Consulta'">Consulta</button>
+          <button class="tgl-btn" style="padding:6px;" onclick="setTgl('tglMassToolbarNature', this, 'Consulta/Sessão'); massNature='Consulta/Sessão'">C/Sessão</button>
           <button class="tgl-btn" style="padding:6px;" onclick="setTgl('tglMassToolbarNature', this, 'Procedimento'); massNature='Procedimento'">Proc.</button>
         </div>
 
@@ -90,6 +91,7 @@
       <label class="form-label">Natureza do Serviço</label>
       <div class="toggle-group" id="tglAllocNature">
           <button class="tgl-btn active" onclick="setTgl('tglAllocNature', this, 'Consulta')">Consulta</button>
+          <button class="tgl-btn" onclick="setTgl('tglAllocNature', this, 'Consulta/Sessão')">Consulta/Sessão</button>
           <button class="tgl-btn" onclick="setTgl('tglAllocNature', this, 'Procedimento')">Procedimento</button>
       </div>
     </div>
