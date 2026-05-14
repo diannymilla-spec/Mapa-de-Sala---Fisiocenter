@@ -16,6 +16,14 @@ let S = {
   weekAnchor: null, monthYear: new Date().getFullYear(), monthMonth: new Date().getMonth()
 };
 
+// RealClinic – cache e estado de sincronização
+let realClinicConvenios = [];
+let realClinicProcedimentos = [];
+let syncInProgress = false;
+let lastSyncTime = null;
+const REALCLINIC_CONVENIOS_FILTRO = ['Particular', 'Orçamento - Cartão Fisiocenter'];
+const REALCLINIC_CONVENIO_MAP = {};
+
 // { unitId: true } para cada unidade desbloqueada. Admin desbloqueia todas.
 let configActive = {};
 let isAdminActive = false;
@@ -141,6 +149,189 @@ async function removeSlots(keys) {
     if (error) { console.error('removeSlots:', error); showToast('ERRO AO REMOVER SLOTS'); }
 }
 
+// ── REALCLINIC – SYNC ──────────────────────────────────────────────────────
+
+async function callRealClinicAPI(action, body = {}) {
+  const response = await fetch('/api/realclinic-sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...body })
+  });
+  if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Erro API RealClinic'); }
+  return response.json();
+}
+
+async function syncRealClinicData() {
+  if (syncInProgress) { showToast('Sincronização já em progresso...'); return; }
+  syncInProgress = true;
+  showToast('Sincronizando dados do RealClinic...');
+  try {
+    realClinicConvenios    = await callRealClinicAPI('list-convenios') || [];
+    realClinicProcedimentos = await callRealClinicAPI('list-procedimentos') || [];
+    realClinicConvenios.forEach(c => { REALCLINIC_CONVENIO_MAP[c.Nome] = c.Id; });
+    lastSyncTime = new Date();
+    showToast('✓ Sincronização com RealClinic concluída!');
+    renderCfgBody('medicos');
+  } catch (err) {
+    showToast('✗ Erro ao sincronizar: ' + err.message);
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+async function syncDoctorProcedimentoValores(doctor) {
+  if (!doctor.realClinicId) { showToast('Médico sem ID no RealClinic'); return null; }
+  const unit = S.units.find(u => u.id === doctor.unitId);
+  if (!unit?.realClinicId) { showToast('Unidade sem ID no RealClinic'); return null; }
+  const procedimentoIds = (doctor.procedimentos || []).map(p => p.id);
+  const convs = doctor.convenios || [];
+  if (!procedimentoIds.length || !convs.length) { showToast('Médico sem procedimentos ou convênios'); return null; }
+  showToast('Sincronizando valores...');
+  try {
+    const valores = await callRealClinicAPI('sync-doctor-valores', {
+      idEmpresa: unit.realClinicId, docRealClinicId: doctor.realClinicId,
+      procedimentoIds, convenioIds: convs.map(c => c.id), planoIds: convs.map(c => c.planoId)
+    });
+    convs.forEach(conv => {
+      conv.procedimentos = valores.filter(v => v.convenioId === conv.id).map(v => ({
+        id: v.procedimentoId,
+        nome: realClinicProcedimentos.find(p => p.Id === v.procedimentoId)?.Nome || 'Proc. #' + v.procedimentoId,
+        valor: v.valor
+      }));
+    });
+    doctor.convenios = convs;
+    saveConfig();
+    showToast('✓ Valores do médico sincronizados!');
+    return doctor;
+  } catch (err) {
+    showToast('✗ Erro ao sincronizar médico: ' + err.message);
+    return null;
+  }
+}
+
+function getAvailableProcedimentos() { return realClinicProcedimentos || []; }
+function getFilteredConvenios() { return realClinicConvenios.filter(c => REALCLINIC_CONVENIOS_FILTRO.includes(c.Nome)); }
+
+// ── TABELA DE PREÇOS ───────────────────────────────────────────────────────
+
+function renderPriceTable() {
+  const el = document.getElementById('mainContent');
+  const unit = S.units.find(u => u.id === S.currentUnit);
+  if (!unit) { el.innerHTML = ''; return; }
+
+  const doctors = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived && d.convenios && d.convenios.length > 0);
+
+  if (!doctors.length) {
+    el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--t3);"><div style="font-size:14px;margin-bottom:8px;">Nenhum profissional com valores cadastrados</div><div style="font-size:11px;">Vá ao painel de config → Médicos, marque convênios e procedimentos e salve.</div></div>`;
+    return;
+  }
+
+  const filterDocId = document.getElementById('filterPriceDoc')?.value || '';
+  const filterConv  = document.getElementById('filterPriceConv')?.value || '';
+
+  const allConvenioNames = [...new Set(doctors.flatMap(d => d.convenios.map(c => c.nome)))].sort();
+
+  let rows = '';
+  let rowCount = 0;
+  doctors.forEach(doc => {
+    if (filterDocId && doc.id !== filterDocId) return;
+    doc.convenios.forEach(conv => {
+      if (filterConv && conv.nome !== filterConv) return;
+      const procs = conv.procedimentos || [];
+      if (!procs.length) {
+        rows += `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px;color:var(--text);font-weight:700;">${doc.name}</td>
+          <td style="padding:10px;color:var(--t2);">${doc.spec}</td>
+          <td style="padding:10px;color:var(--t2);">${conv.nome}</td>
+          <td style="padding:10px;color:var(--t3);">—</td>
+          <td style="padding:10px;text-align:right;color:var(--t3);">—</td></tr>`;
+        rowCount++;
+      } else {
+        procs.forEach((proc, idx) => {
+          rows += `<tr style="border-bottom:1px solid var(--border);">
+            ${idx === 0 ? `<td style="padding:10px;color:var(--text);font-weight:700;" rowspan="${procs.length}">${doc.name}</td><td style="padding:10px;color:var(--t2);" rowspan="${procs.length}">${doc.spec}</td><td style="padding:10px;color:var(--t2);" rowspan="${procs.length}">${conv.nome}</td>` : ''}
+            <td style="padding:10px;color:var(--text);">${proc.nome}</td>
+            <td style="padding:10px;text-align:right;color:var(--active);font-weight:700;">R$ ${parseFloat(proc.valor||0).toFixed(2).replace('.',',')}</td></tr>`;
+        });
+        rowCount += procs.length;
+      }
+    });
+  });
+
+  if (!rowCount) rows = `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--t3);">Nenhum resultado com os filtros selecionados.</td></tr>`;
+
+  el.innerHTML = `
+  <div style="padding:20px;">
+    <h2 style="font-family:'Fraunces';font-size:18px;color:var(--accent);margin-bottom:16px;">Tabela de Preços — ${unit.name}</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;padding:14px 16px;background:var(--s2);border-radius:var(--r);border:1px solid var(--border);">
+      <div><div style="font-size:9px;font-weight:800;color:var(--t3);text-transform:uppercase;margin-bottom:4px;">Profissional</div>
+        <select id="filterPriceDoc" class="inp" style="width:200px;padding:6px 8px;font-size:11px;" onchange="renderPriceTable()">
+          <option value="">— Todos —</option>
+          ${doctors.map(d=>`<option value="${d.id}" ${filterDocId===d.id?'selected':''}>${d.name}</option>`).join('')}
+        </select></div>
+      <div><div style="font-size:9px;font-weight:800;color:var(--t3);text-transform:uppercase;margin-bottom:4px;">Convênio</div>
+        <select id="filterPriceConv" class="inp" style="width:200px;padding:6px 8px;font-size:11px;" onchange="renderPriceTable()">
+          <option value="">— Todos —</option>
+          ${allConvenioNames.map(n=>`<option value="${n}" ${filterConv===n?'selected':''}>${n}</option>`).join('')}
+        </select></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="dash-table" style="font-size:11px;">
+        <thead><tr>
+          <th>Profissional</th><th>Especialidade</th><th>Convênio</th><th>Procedimento</th>
+          <th style="text-align:right;">Valor</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function showDoctorDetailsModal(doctorId) {
+  const doctor = S.doctors.find(d => d.id === doctorId);
+  if (!doctor) return;
+  const existing = document.getElementById('doctorDetailsModal');
+  if (existing) existing.remove();
+  const html = `
+  <div class="modal-overlay open" id="doctorDetailsModal" onclick="closeDoctorDetailsModal()">
+    <div class="modal-card" onclick="event.stopPropagation()" style="max-width:560px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="font-family:'Fraunces';font-size:18px;color:var(--accent);margin:0;">${doctor.name}</h2>
+        <button class="btn" style="padding:5px 10px" onclick="closeDoctorDetailsModal()">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;padding:12px;background:var(--s2);border-radius:var(--r);border:1px solid var(--border);">
+        <div><div style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-bottom:4px;">Especialidade</div><div style="font-weight:700;">${doctor.spec}</div></div>
+        <div><div style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-bottom:4px;">Atendimento</div><div style="font-weight:700;">${doctor.type === 'hora' ? 'Hora Marcada' : 'Ordem de Chegada'}</div></div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Convênios</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${(doctor.convenios||[]).map(c=>`<span style="background:rgba(79,142,247,0.1);border:1px solid var(--accent);color:var(--accent);padding:4px 10px;border-radius:4px;font-size:10px;font-weight:700;">${c.nome}</span>`).join('')||'<span style="color:var(--t3);font-size:10px;">Nenhum</span>'}
+        </div>
+      </div>
+      ${(doctor.convenios||[]).some(c=>(c.procedimentos||[]).length)? `
+      <div>
+        <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Tabela de Valores</div>
+        <table class="dash-table" style="font-size:10px;">
+          <thead><tr><th>Procedimento</th><th style="text-align:right;">Valor</th></tr></thead>
+          <tbody>
+            ${(doctor.convenios||[]).flatMap(conv=>(conv.procedimentos||[]).map(p=>`
+              <tr><td>${p.nome}<div style="font-size:9px;color:var(--t2);">${conv.nome}</div></td>
+              <td style="text-align:right;color:var(--active);font-weight:700;">R$ ${parseFloat(p.valor||0).toFixed(2).replace('.',',')}</td></tr>`)).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeDoctorDetailsModal() {
+  document.getElementById('doctorDetailsModal')?.remove();
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+
 async function init() {
     // 1. Carregar estado de UI do localStorage
     const uiState = localStorage.getItem('mds_ui_state');
@@ -242,17 +433,18 @@ function renderNavLabel(){
 function setView(v){
     if (isMassMode && v !== 'month') toggleMassMode();
     S.view = v;
-    ['btnWeek','btnMonth','btnDash'].forEach(id => { const b=document.getElementById(id); if(b) b.classList.remove('active'); });
-    const activeId = v==='week'?'btnWeek':v==='month'?'btnMonth':'btnDash';
+    ['btnWeek','btnMonth','btnDash','btnPriceTable'].forEach(id => { const b=document.getElementById(id); if(b) b.classList.remove('active'); });
+    const activeId = v==='week'?'btnWeek':v==='month'?'btnMonth':v==='priceTable'?'btnPriceTable':'btnDash';
     const ab = document.getElementById(activeId); if(ab) ab.classList.add('active');
     const navGroup = document.getElementById('navGroup');
-    if(navGroup) navGroup.style.display = v==='dashboard' ? 'none' : '';
+    if(navGroup) navGroup.style.display = (v==='dashboard' || v==='priceTable') ? 'none' : '';
     renderNavLabel(); renderMain(); saveLocal();
 }
 
 // RENDERIZAÇÃO
 function renderMain() {
   if (S.view === 'dashboard') { renderDashboard(); return; }
+  if (S.view === 'priceTable') { renderPriceTable(); return; }
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if(!unit) { el.innerHTML = "Unidade não encontrada."; return; }
@@ -993,8 +1185,15 @@ function renderCfgBody(tab) {
         const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
         const activeDocs   = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived).sort(sortByName);
         const archivedDocs = S.doctors.filter(d => d.unitId === S.currentUnit && d.archived).sort(sortByName);
+        const syncStatusHtml = lastSyncTime
+            ? `<div style="font-size:9px;color:var(--t3);text-align:center;margin-top:4px;">Última sync: ${new Date(lastSyncTime).toLocaleString('pt-BR')}</div>`
+            : '';
         body.innerHTML = `
-            <div class="form-group" style="margin-bottom:15px;">
+            <button class="btn btn-primary" style="width:100%;margin-bottom:4px;" onclick="syncRealClinicData()" ${syncInProgress ? 'disabled' : ''}>
+                ${syncInProgress ? '⏳ SINCRONIZANDO...' : '🔄 SINCRONIZAR COM REALCLINIC'}
+            </button>
+            ${syncStatusHtml}
+            <div class="form-group" style="margin-bottom:15px;margin-top:12px;">
                 <label class="form-label" style="font-size:11px; text-transform:none; letter-spacing:0;">
                     Adicionando médicos na unidade: <strong style="color:var(--accent); text-transform:uppercase;">${unit.name}</strong>
                 </label>
@@ -1127,6 +1326,31 @@ function editDoctor(id) {
     let cleanName = d.name.replace('Dr. ', '').replace('Dra. ', '');
     let type = d.type || 'hora';
     let defNature = d.defaultNature || '';
+    const docConvenios = d.convenios || [];
+    const docProcs = d.procedimentos || [];
+
+    const convenios = getFilteredConvenios();
+    const procedimentos = getAvailableProcedimentos();
+
+    const convHtml = convenios.length > 0 ? `
+        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-top:4px;">Convênios Atendidos</label>
+        <div style="display:flex;flex-direction:column;gap:4px;background:var(--s1);padding:8px;border-radius:4px;border:1px solid var(--border);">
+            ${convenios.map(c => `
+                <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;">
+                    <input type="checkbox" data-conv-id="${c.Id}" ${docConvenios.includes(String(c.Id)) ? 'checked' : ''}>
+                    ${c.Nome || c.Descricao || c.id}
+                </label>`).join('')}
+        </div>` : '';
+
+    const procHtml = procedimentos.length > 0 ? `
+        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-top:4px;">Procedimentos Realizados</label>
+        <div style="display:flex;flex-direction:column;gap:4px;background:var(--s1);padding:8px;border-radius:4px;border:1px solid var(--border);max-height:150px;overflow-y:auto;">
+            ${procedimentos.map(p => `
+                <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;">
+                    <input type="checkbox" data-proc-id="${p.Id}" ${docProcs.includes(String(p.Id)) ? 'checked' : ''}>
+                    ${p.Nome || p.Descricao || p.id}
+                </label>`).join('')}
+        </div>` : '';
 
     row.innerHTML = `
         <div style="display:flex; flex-direction:column; flex:1; gap:8px">
@@ -1146,8 +1370,10 @@ function editDoctor(id) {
                 <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" data-val="Consulta" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Consulta</button>
                 <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" data-val="Procedimento" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Procedimento</button>
             </div>
+            ${convHtml}
+            ${procHtml}
         </div>
-        <div style="display:flex; flex-direction:column; gap:5px; margin-left:10px; align-items:center; justify-content:center;">
+        <div style="display:flex; flex-direction:column; gap:5px; margin-left:10px; align-items:center; justify-content:flex-start; padding-top:4px;">
             <button class="btn btn-primary" style="padding:10px" onclick="saveDoctorEdit('${id}')" title="Salvar Alterações">✓</button>
             <button class="btn btn-ghost" style="padding:10px" onclick="renderCfgBody('medicos')" title="Cancelar">✕</button>
         </div>
@@ -1157,6 +1383,7 @@ function editDoctor(id) {
 function saveDoctorEdit(id) {
     const cleanName = document.getElementById(`edit-d-name-${id}`).value;
     const spec = document.getElementById(`edit-d-spec-${id}`).value;
+    const row = document.getElementById(`row-d-${id}`);
 
     const prefixBtn = document.querySelector(`#edit-tglPrefix-${id} .active`);
     const prefix = prefixBtn ? prefixBtn.getAttribute('data-val') : 'Dr.';
@@ -1167,12 +1394,17 @@ function saveDoctorEdit(id) {
     const defNatureBtn = document.querySelector(`#edit-tglDefNature-${id} .active`);
     const defaultNature = defNatureBtn ? defNatureBtn.getAttribute('data-val') : '';
 
+    const checkedConvenios = row ? [...row.querySelectorAll('input[data-conv-id]:checked')].map(i => i.getAttribute('data-conv-id')) : [];
+    const checkedProcs = row ? [...row.querySelectorAll('input[data-proc-id]:checked')].map(i => i.getAttribute('data-proc-id')) : [];
+
     const d = S.doctors.find(x => x.id === id);
     if(cleanName && d) {
         d.name = prefix + ' ' + cleanName;
         d.spec = spec;
         d.type = type;
         d.defaultNature = defaultNature || null;
+        d.convenios = checkedConvenios;
+        d.procedimentos = checkedProcs;
         saveConfig();
         renderCfgBody('medicos');
         showToast('MÉDICO ATUALIZADO COM SUCESSO!');
