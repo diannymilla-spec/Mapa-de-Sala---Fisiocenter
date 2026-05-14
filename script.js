@@ -990,7 +990,7 @@ function filterDoctors(query) {
 
     const filtered = q
         ? unitDocs.filter(d => d.name.toLowerCase().includes(q) || (d.spec || '').toLowerCase().includes(q))
-        : unitDocs.filter(d => d.id === searchSelectedDocId);
+        : (searchSelectedDocId ? unitDocs.filter(d => d.id === searchSelectedDocId) : []);
 
     const sorted = [...filtered].sort((a, b) => {
         const nA = a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').trim();
@@ -1003,7 +1003,12 @@ function filterDoctors(query) {
         return;
     }
 
-    let html = `<div style="margin-bottom:${searchSelectedDocId ? '12px' : '0'};">`;
+    const hasSelection = searchSelectedDocId && sorted.find(d => d.id === searchSelectedDocId);
+    const hint = !hasSelection && sorted.length > 1
+        ? `<div style="font-size:10px;color:var(--t3);padding:6px 12px 2px;">Clique em um profissional para ver só a agenda dele.</div>`
+        : (hasSelection ? `<div style="font-size:10px;color:var(--t3);padding:6px 12px 2px;">Clique novamente para ver todos.</div>` : '');
+
+    let html = hint + `<div>`;
     sorted.forEach(doc => {
         const sel = doc.id === searchSelectedDocId;
         html += `
@@ -1014,14 +1019,94 @@ function filterDoctors(query) {
     });
     html += `</div>`;
 
-    if (searchSelectedDocId) html += renderDoctorSchedule(searchSelectedDocId);
+    if (hasSelection) {
+        html += renderDoctorSchedule(searchSelectedDocId);
+    } else {
+        html += renderMultiDoctorSchedule(sorted.map(d => d.id));
+    }
 
     body.innerHTML = html;
 }
 
 function selectDoctor(docId) {
-    searchSelectedDocId = docId;
+    searchSelectedDocId = (searchSelectedDocId === docId) ? null : docId;
     filterDoctors(document.getElementById('searchInp').value);
+}
+
+function renderMultiDoctorSchedule(docIds) {
+    const allEntries = Object.entries(S.slots).filter(([key, slot]) => {
+        const p = key.split('|');
+        return p[0] === S.currentUnit && docIds.includes(slot.doctorId);
+    });
+
+    const entries = allEntries.filter(([key]) => key.split('|')[2].slice(0, 7) >= searchFromMonth);
+
+    entries.sort(([kA], [kB]) => {
+        const pA = kA.split('|'), pB = kB.split('|');
+        const dc = pA[2].localeCompare(pB[2]);
+        return dc !== 0 ? dc : (pA[3] === 'manha' ? -1 : 1);
+    });
+
+    const byMonth = {};
+    entries.forEach(([key, slot]) => {
+        const p = key.split('|');
+        const date = p[2], period = p[3], monthKey = date.slice(0, 7);
+        if (!byMonth[monthKey]) byMonth[monthKey] = [];
+        const unit = S.units.find(u => u.id === S.currentUnit);
+        const room = unit?.rooms.find(r => r.id === p[1]);
+        const doc  = S.doctors.find(d => d.id === slot.doctorId);
+        byMonth[monthKey].push({ slot, date, period, room, doc });
+    });
+
+    const specLabel = docIds.length === 1
+        ? (S.doctors.find(d => d.id === docIds[0])?.spec || '')
+        : (S.doctors.find(d => d.id === docIds[0])?.spec || `${docIds.length} profissionais`);
+
+    let html = `<div style="border-top:1px solid var(--border);padding-top:14px;">
+        <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Agenda — ${specLabel}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 10px;background:var(--s3);border-radius:var(--r);border:1px solid var(--border);">
+            <span style="font-size:9px;font-weight:800;color:var(--t3);text-transform:uppercase;white-space:nowrap;">A partir de:</span>
+            <input type="month" value="${searchFromMonth}"
+                   style="background:var(--s4);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);font-size:11px;flex:1;font-family:inherit;outline:none;"
+                   onchange="searchFromMonth=this.value; filterDoctors(document.getElementById('searchInp').value)">
+        </div>`;
+
+    if (!entries.length) {
+        html += `<div style="color:var(--t3);font-size:11px;padding:12px;text-align:center;">Nenhum atendimento no período selecionado.</div>`;
+    } else {
+        Object.entries(byMonth).sort(([a],[b]) => a.localeCompare(b)).forEach(([monthKey, items]) => {
+            const [yr, mo] = monthKey.split('-');
+            html += `<div style="font-size:9px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">${MONTHS_PT[+mo-1]} ${yr}</div>`;
+            items.forEach(({ slot, date, period, room, doc }) => {
+                const dt = parse(date);
+                const dayName = DAYS_PT[dt.getDay()];
+                const dayNum = `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+                const periodLabel = period === 'manha' ? 'Manhã' : 'Tarde';
+                const statusLabel = slot.status === 'canceled' ? 'Cancelado' : 'Ativo';
+                const statusColor = slot.status === 'canceled' ? 'var(--cancel)' : 'var(--active)';
+                const natLabel = slot.nature || (doc && doc.defNature) || 'Consulta';
+                const roomName = room ? room.name : '—';
+                html += `
+                <div class="search-sched-item ${slot.status}" onclick="navigateToDate('${date}')">
+                    <div style="font-weight:700;font-size:11px;color:var(--text);">${dayName}, ${dayNum}</div>
+                    <div style="font-size:10px;color:var(--accent);margin-top:1px;">${doc ? doc.name : '—'}</div>
+                    <div style="display:flex;gap:6px;margin-top:3px;align-items:center;flex-wrap:wrap;">
+                        <span style="font-size:9px;color:var(--t2);">${periodLabel}</span>
+                        <span style="font-size:8px;color:var(--t3);">·</span>
+                        <span style="font-size:9px;color:var(--t2);">${roomName}</span>
+                        <span style="font-size:8px;color:var(--t3);">·</span>
+                        <span style="font-size:9px;font-weight:700;color:${statusColor};">${statusLabel}</span>
+                        <span style="font-size:8px;color:var(--t3);">·</span>
+                        <span style="font-size:9px;color:var(--t2);">${natLabel}</span>
+                    </div>
+                </div>`;
+            });
+            html += `<div style="margin-bottom:10px;"></div>`;
+        });
+    }
+
+    html += `</div>`;
+    return html;
 }
 
 function renderDoctorSchedule(docId) {
