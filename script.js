@@ -214,77 +214,93 @@ function getFilteredConvenios() { return realClinicConvenios.filter(c => REALCLI
 
 // ── TABELA DE PREÇOS ───────────────────────────────────────────────────────
 
+function fmtPrice(val) {
+    if (!val) return '';
+    const num = parseFloat(String(val).replace(',', '.'));
+    if (isNaN(num)) return String(val);
+    return 'R$' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function renderPriceTable() {
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if (!unit) { el.innerHTML = ''; return; }
 
-  const doctors = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived && d.convenios && d.convenios.length > 0);
+  const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
+  const doctors = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived).sort(sortByName);
 
-  if (!doctors.length) {
-    el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--t3);"><div style="font-size:14px;margin-bottom:8px;">Nenhum profissional com valores cadastrados</div><div style="font-size:11px;">Vá ao painel de config → Médicos, marque convênios e procedimentos e salve.</div></div>`;
-    return;
-  }
-
-  const filterDocId = document.getElementById('filterPriceDoc')?.value || '';
-  const filterConv  = document.getElementById('filterPriceConv')?.value || '';
-
-  const allConvenioNames = [...new Set(doctors.flatMap(d => d.convenios.map(c => c.nome)))].sort();
-
-  let rows = '';
-  let rowCount = 0;
-  doctors.forEach(doc => {
-    if (filterDocId && doc.id !== filterDocId) return;
-    doc.convenios.forEach(conv => {
-      if (filterConv && conv.nome !== filterConv) return;
-      const procs = conv.procedimentos || [];
-      if (!procs.length) {
-        rows += `<tr style="border-bottom:1px solid var(--border);">
-          <td style="padding:10px;color:var(--text);font-weight:700;">${doc.name}</td>
-          <td style="padding:10px;color:var(--t2);">${doc.spec}</td>
-          <td style="padding:10px;color:var(--t2);">${conv.nome}</td>
-          <td style="padding:10px;color:var(--t3);">—</td>
-          <td style="padding:10px;text-align:right;color:var(--t3);">—</td></tr>`;
-        rowCount++;
-      } else {
-        procs.forEach((proc, idx) => {
-          rows += `<tr style="border-bottom:1px solid var(--border);">
-            ${idx === 0 ? `<td style="padding:10px;color:var(--text);font-weight:700;" rowspan="${procs.length}">${doc.name}</td><td style="padding:10px;color:var(--t2);" rowspan="${procs.length}">${doc.spec}</td><td style="padding:10px;color:var(--t2);" rowspan="${procs.length}">${conv.nome}</td>` : ''}
-            <td style="padding:10px;color:var(--text);">${proc.nome}</td>
-            <td style="padding:10px;text-align:right;color:var(--active);font-weight:700;">R$ ${parseFloat(proc.valor||0).toFixed(2).replace('.',',')}</td></tr>`;
-        });
-        rowCount += procs.length;
-      }
-    });
-  });
-
-  if (!rowCount) rows = `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--t3);">Nenhum resultado com os filtros selecionados.</td></tr>`;
+  const rows = doctors.map(d => {
+    const nature = d.defaultNature || '—';
+    const hasConsulta = d.defaultNature === 'Consulta' || d.defaultNature === 'Consulta/Sessão';
+    const pp = hasConsulta && d.priceParticular ? fmtPrice(d.priceParticular) : '—';
+    const pc = hasConsulta && d.priceCartao     ? fmtPrice(d.priceCartao)     : '—';
+    const ppColor = (hasConsulta && d.priceParticular) ? 'var(--active)' : 'var(--t3)';
+    const pcColor = (hasConsulta && d.priceCartao)     ? 'var(--active)' : 'var(--t3)';
+    return `<tr id="price-row-${d.id}" style="border-bottom:1px solid var(--border);">
+      <td style="padding:10px 12px;font-weight:700;">${d.name}</td>
+      <td style="padding:10px 12px;color:var(--t2);font-style:italic;">${d.spec}</td>
+      <td style="padding:10px 12px;"><span style="font-size:9px;font-weight:800;text-transform:uppercase;background:var(--s3);padding:3px 7px;border-radius:3px;color:var(--t2);">${nature}</span></td>
+      <td id="price-pp-${d.id}" style="padding:10px 12px;font-weight:700;color:${ppColor};">${pp}</td>
+      <td id="price-pc-${d.id}" style="padding:10px 12px;font-weight:700;color:${pcColor};">${pc}</td>
+      <td style="padding:6px 12px;text-align:right;">
+        <button class="btn btn-edit" style="padding:5px 10px;" onclick="editPriceRow('${d.id}')">✎</button>
+      </td>
+    </tr>`;
+  }).join('');
 
   el.innerHTML = `
   <div style="padding:20px;">
-    <h2 style="font-family:'Fraunces';font-size:18px;color:var(--accent);margin-bottom:16px;">Tabela de Preços — ${unit.name}</h2>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;padding:14px 16px;background:var(--s2);border-radius:var(--r);border:1px solid var(--border);">
-      <div><div style="font-size:9px;font-weight:800;color:var(--t3);text-transform:uppercase;margin-bottom:4px;">Profissional</div>
-        <select id="filterPriceDoc" class="inp" style="width:200px;padding:6px 8px;font-size:11px;" onchange="renderPriceTable()">
-          <option value="">— Todos —</option>
-          ${doctors.map(d=>`<option value="${d.id}" ${filterDocId===d.id?'selected':''}>${d.name}</option>`).join('')}
-        </select></div>
-      <div><div style="font-size:9px;font-weight:800;color:var(--t3);text-transform:uppercase;margin-bottom:4px;">Convênio</div>
-        <select id="filterPriceConv" class="inp" style="width:200px;padding:6px 8px;font-size:11px;" onchange="renderPriceTable()">
-          <option value="">— Todos —</option>
-          ${allConvenioNames.map(n=>`<option value="${n}" ${filterConv===n?'selected':''}>${n}</option>`).join('')}
-        </select></div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px;">
+      <h2 style="font-family:'Fraunces';font-size:18px;color:var(--accent);">Tabela de Preços</h2>
+      <span style="font-size:11px;color:var(--t3);">${unit.name}</span>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="dash-table" style="font-size:11px;">
-        <thead><tr>
-          <th>Profissional</th><th>Especialidade</th><th>Convênio</th><th>Procedimento</th>
-          <th style="text-align:right;">Valor</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:18px;">Valores de consulta por profissional. Clique em ✎ para editar qualquer linha.</p>
+    <div style="overflow-x:auto;border-radius:var(--r);border:1px solid var(--border);">
+      <table class="dash-table" style="font-size:12px;width:100%;">
+        <thead>
+          <tr>
+            <th style="padding:10px 12px;">Profissional</th>
+            <th style="padding:10px 12px;">Especialidade</th>
+            <th style="padding:10px 12px;">Natureza</th>
+            <th style="padding:10px 12px;">Particular</th>
+            <th style="padding:10px 12px;">Cartão Fisiocenter</th>
+            <th style="padding:10px 12px;width:60px;"></th>
+          </tr>
+        </thead>
+        <tbody>${rows || `<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--t3);">Nenhum profissional cadastrado nesta unidade.</td></tr>`}</tbody>
       </table>
     </div>
   </div>`;
+}
+
+function editPriceRow(id) {
+  const d = S.doctors.find(x => x.id === id);
+  if (!d) return;
+  const row = document.getElementById(`price-row-${id}`);
+  if (!row) return;
+  const nature = d.defaultNature || '—';
+  row.innerHTML = `
+    <td style="padding:10px 12px;font-weight:700;">${d.name}</td>
+    <td style="padding:10px 12px;color:var(--t2);font-style:italic;">${d.spec}</td>
+    <td style="padding:10px 12px;"><span style="font-size:9px;font-weight:800;text-transform:uppercase;background:var(--s3);padding:3px 7px;border-radius:3px;color:var(--t2);">${nature}</span></td>
+    <td style="padding:6px 12px;"><input type="text" class="inp" id="pt-pp-${id}" value="${d.priceParticular || ''}" placeholder="0,00" style="padding:6px 8px;width:100px;"></td>
+    <td style="padding:6px 12px;"><input type="text" class="inp" id="pt-pc-${id}" value="${d.priceCartao || ''}" placeholder="0,00" style="padding:6px 8px;width:100px;"></td>
+    <td style="padding:6px 12px;text-align:right;white-space:nowrap;">
+      <button class="btn btn-ghost" style="padding:5px 8px;font-size:10px;" onclick="renderPriceTable()">✕</button>
+      <button class="btn btn-primary" style="padding:5px 10px;font-size:10px;margin-left:4px;" onclick="savePriceRow('${id}')">✓ Salvar</button>
+    </td>`;
+}
+
+function savePriceRow(id) {
+  const d = S.doctors.find(x => x.id === id);
+  if (!d) return;
+  const pp = document.getElementById(`pt-pp-${id}`)?.value.trim();
+  const pc = document.getElementById(`pt-pc-${id}`)?.value.trim();
+  d.priceParticular = pp || null;
+  d.priceCartao = pc || null;
+  saveConfig();
+  showToast('VALORES ATUALIZADOS!');
+  renderPriceTable();
 }
 
 function showDoctorDetailsModal(doctorId) {
@@ -433,17 +449,18 @@ function renderNavLabel(){
 function setView(v){
     if (isMassMode && v !== 'month') toggleMassMode();
     S.view = v;
-    ['btnWeek','btnMonth','btnDash'].forEach(id => { const b=document.getElementById(id); if(b) b.classList.remove('active'); });
-    const activeId = v==='week'?'btnWeek':v==='month'?'btnMonth':'btnDash';
+    ['btnWeek','btnMonth','btnDash','btnPriceTable'].forEach(id => { const b=document.getElementById(id); if(b) b.classList.remove('active'); });
+    const activeId = v==='week'?'btnWeek':v==='month'?'btnMonth':v==='priceTable'?'btnPriceTable':'btnDash';
     const ab = document.getElementById(activeId); if(ab) ab.classList.add('active');
     const navGroup = document.getElementById('navGroup');
-    if(navGroup) navGroup.style.display = v==='dashboard' ? 'none' : '';
+    if(navGroup) navGroup.style.display = (v==='dashboard' || v==='priceTable') ? 'none' : '';
     renderNavLabel(); renderMain(); saveLocal();
 }
 
 // RENDERIZAÇÃO
 function renderMain() {
-  if (S.view === 'dashboard') { renderDashboard(); return; }
+  if (S.view === 'dashboard')  { renderDashboard();  return; }
+  if (S.view === 'priceTable') { renderPriceTable(); return; }
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if(!unit) { el.innerHTML = "Unidade não encontrada."; return; }
@@ -590,8 +607,8 @@ function slotHTML(slot, key, isMonthView) {
   let tooltip = `${doc.name}\nEspecialidade: ${doc.spec}\nNatureza: ${natureTxt}\nAtendimento: ${typeDisplay}`;
 
   if ((natureTxt === 'Consulta' || natureTxt === 'Consulta/Sessão') && (doc.priceParticular || doc.priceCartao)) {
-      if (doc.priceParticular) tooltip += `\nParticular: R$ ${doc.priceParticular}`;
-      if (doc.priceCartao) tooltip += `\nCartão Fisiocenter: R$ ${doc.priceCartao}`;
+      if (doc.priceParticular) tooltip += `\nParticular: ${fmtPrice(doc.priceParticular)}`;
+      if (doc.priceCartao) tooltip += `\nCartão Fisiocenter: ${fmtPrice(doc.priceCartao)}`;
   }
 
   let obsWarning = '';
