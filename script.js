@@ -12,7 +12,7 @@ let S = {
     {id:'u2', name:'FISIOTERAPIA', rooms: Array.from({length:7}, (_,i) => ({id:'rf'+(i+1), name: `SALA ${i+1}`}))},
     {id:'u3', name:'ABAETETUBA', rooms: []}
   ],
-  doctors: [], slots: {}, currentUnit: 'u1', view: 'week',
+  doctors: [], slots: {}, priceEntries: [], currentUnit: 'u1', view: 'week',
   weekAnchor: null, monthYear: new Date().getFullYear(), monthMonth: new Date().getMonth()
 };
 
@@ -104,8 +104,9 @@ function saveLocal() {
 // Configurações (units + doctors) → Supabase mapa_config
 async function saveConfig() {
     const { error } = await _supabase.from('mapa_config').upsert([
-        { id: 'units',   data: S.units },
-        { id: 'doctors', data: S.doctors }
+        { id: 'units',        data: S.units },
+        { id: 'doctors',      data: S.doctors },
+        { id: 'priceEntries', data: S.priceEntries || [] }
     ]);
     if (error) { console.error('saveConfig:', error); showToast('ERRO AO SALVAR CONFIGURAÇÃO'); }
 }
@@ -227,66 +228,88 @@ function renderPriceTable() {
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
   if (!unit) { el.innerHTML = ''; return; }
+  if (!S.priceEntries) S.priceEntries = [];
 
+  const canEdit = isEditActive(S.currentUnit);
   const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
   const q = _priceSearch.toLowerCase().trim();
-  const doctors = S.doctors.filter(d => {
-    if (d.unitId !== S.currentUnit || d.archived) return false;
-    if (!q) return true;
-    return d.name.toLowerCase().includes(q)
-        || d.spec.toLowerCase().includes(q)
-        || (d.priceParticular && fmtPrice(d.priceParticular).toLowerCase().includes(q))
-        || (d.priceCartao     && fmtPrice(d.priceCartao).toLowerCase().includes(q));
-  }).sort(sortByName);
+
+  let doctors = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived).sort(sortByName);
+  if (q) {
+    doctors = doctors.filter(d => {
+      if (d.name.toLowerCase().includes(q) || d.spec.toLowerCase().includes(q)) return true;
+      return S.priceEntries.filter(e => e.doctorId === d.id && e.unitId === S.currentUnit).some(e =>
+        (e.label || '').toLowerCase().includes(q) ||
+        (e.priceParticular && fmtPrice(e.priceParticular).toLowerCase().includes(q)) ||
+        (e.priceCartao     && fmtPrice(e.priceCartao).toLowerCase().includes(q))
+      );
+    });
+  }
 
   const rows = doctors.map(d => {
-    const nature = d.defaultNature || '—';
-    const hasConsulta = d.defaultNature === 'Consulta' || d.defaultNature === 'Consulta/Sessão';
-    const pp = hasConsulta && d.priceParticular ? fmtPrice(d.priceParticular) : '—';
-    const pc = hasConsulta && d.priceCartao     ? fmtPrice(d.priceCartao)     : '—';
-    const ppColor = (hasConsulta && d.priceParticular) ? 'var(--active)' : 'var(--t3)';
-    const pcColor = (hasConsulta && d.priceCartao)     ? 'var(--active)' : 'var(--t3)';
-    return `<tr id="price-row-${d.id}" style="border-bottom:1px solid var(--border);">
-      <td style="padding:10px 12px;font-weight:700;">${d.name}</td>
-      <td style="padding:10px 12px;color:var(--t2);font-style:italic;">${d.spec}</td>
-      <td style="padding:10px 12px;"><span style="font-size:9px;font-weight:800;text-transform:uppercase;background:var(--s3);padding:3px 7px;border-radius:3px;color:var(--t2);">${nature}</span></td>
-      <td id="price-pp-${d.id}" style="padding:10px 12px;font-weight:700;color:${ppColor};">${pp}</td>
-      <td id="price-pc-${d.id}" style="padding:10px 12px;font-weight:700;color:${pcColor};">${pc}</td>
-      <td style="padding:6px 12px;text-align:right;">
-        ${isEditActive(S.currentUnit) ? `<button class="btn btn-edit" style="padding:5px 10px;" onclick="editPriceRow('${d.id}')">✎</button>` : ''}
-      </td>
-    </tr>`;
+    const entries = S.priceEntries.filter(e => e.doctorId === d.id && e.unitId === S.currentUnit);
+
+    const docHeader = `<div style="font-weight:700;">${d.name}</div><div style="font-size:10px;color:var(--t3);font-style:italic;">${d.spec}</div>`;
+
+    if (!entries.length) {
+      return `<tr id="price-doc-${d.id}" style="border-bottom:2px solid var(--border);">
+        <td style="padding:10px 12px;">${docHeader}</td>
+        <td style="padding:10px 12px;color:var(--t3);font-size:11px;">—</td>
+        <td style="padding:10px 12px;color:var(--t3);">—</td>
+        <td style="padding:6px 12px;text-align:right;">
+          ${canEdit ? `<button class="btn btn-primary" style="padding:5px 10px;font-size:10px;" onclick="addPriceEntry('${d.id}')">+ Serviço</button>` : ''}
+        </td>
+      </tr>`;
+    }
+
+    return entries.map((e, idx) => {
+      const pp = e.priceParticular ? fmtPrice(e.priceParticular) : '—';
+      const pc = e.priceCartao     ? fmtPrice(e.priceCartao)     : '—';
+      const ppColor = e.priceParticular ? 'var(--active)' : 'var(--t3)';
+      const pcColor = e.priceCartao     ? 'var(--active)' : 'var(--t3)';
+      const isLast = idx === entries.length - 1;
+      return `<tr id="price-entry-${e.id}" style="border-bottom:${isLast ? '2px solid var(--border)' : '1px solid rgba(255,255,255,0.05)'};">
+        <td style="padding:${idx===0?'10px':'6px'} 12px;vertical-align:${idx===0?'top':'middle'};">
+          ${idx===0 ? docHeader : '<span style="color:var(--t3);padding-left:6px;">└</span>'}
+        </td>
+        <td style="padding:8px 12px;">${e.label || '—'}</td>
+        <td style="padding:8px 12px;font-weight:700;color:${ppColor};">${pp}</td>
+        <td style="padding:6px 12px;text-align:right;white-space:nowrap;">
+          ${canEdit ? `
+            ${isLast ? `<button class="btn btn-primary" style="padding:4px 8px;font-size:10px;margin-right:2px;" onclick="addPriceEntry('${d.id}')">+</button>` : ''}
+            <button class="btn btn-edit" style="padding:4px 8px;" onclick="editPriceEntry('${e.id}')">✎</button>
+            <button class="btn btn-danger" style="padding:4px 8px;margin-left:2px;" onclick="deletePriceEntry('${e.id}')">✕</button>
+          ` : ''}
+        </td>
+      </tr>`;
+    }).join('');
   }).join('');
 
   el.innerHTML = `
   <div style="padding:20px;">
-    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px;">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;">
       <h2 style="font-family:'Fraunces';font-size:18px;color:var(--accent);">Tabela de Preços</h2>
       <span style="font-size:11px;color:var(--t3);">${unit.name}</span>
     </div>
     <div style="margin-bottom:16px;">
       <input class="inp" id="priceSearchInp" type="text" value="${_priceSearch.replace(/"/g,'&quot;')}"
-             placeholder="Buscar por profissional, especialidade ou valor..."
+             placeholder="Buscar por profissional, especialidade, serviço ou valor..."
              oninput="_priceSearch=this.value; renderPriceTable();"
-             style="width:100%;max-width:420px;padding:8px 12px;">
-      ${q && !doctors.length ? `<div style="margin-top:8px;font-size:11px;color:var(--t3);">Nenhum resultado para "<strong>${q}</strong>"</div>` : ''}
-      ${q && doctors.length ? `<div style="margin-top:8px;font-size:11px;color:var(--t3);">${doctors.length} resultado${doctors.length>1?'s':''} encontrado${doctors.length>1?'s':''}</div>` : ''}
+             style="width:100%;max-width:440px;padding:8px 12px;">
+      ${q ? `<div style="margin-top:6px;font-size:11px;color:var(--t3);">${doctors.length} profissional${doctors.length!==1?'is':''} encontrado${doctors.length!==1?'s':''}</div>` : ''}
     </div>
     <div style="overflow-x:auto;border-radius:var(--r);border:1px solid var(--border);">
       <table class="dash-table" style="font-size:12px;width:100%;">
-        <thead>
-          <tr>
-            <th style="padding:10px 12px;">Profissional</th>
-            <th style="padding:10px 12px;">Especialidade</th>
-            <th style="padding:10px 12px;">Natureza</th>
-            <th style="padding:10px 12px;">Particular</th>
-            <th style="padding:10px 12px;">Cartão Fisiocenter</th>
-            <th style="padding:10px 12px;width:60px;"></th>
-          </tr>
-        </thead>
-        <tbody>${rows || `<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--t3);">Nenhum profissional cadastrado nesta unidade.</td></tr>`}</tbody>
+        <thead><tr>
+          <th style="padding:10px 12px;min-width:180px;">Profissional</th>
+          <th style="padding:10px 12px;">Serviço / Especialidade</th>
+          <th style="padding:10px 12px;">Particular</th>
+          <th style="padding:10px 12px;width:${canEdit?'160px':'10px'};"></th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--t3);">Nenhum profissional cadastrado nesta unidade.</td></tr>`}</tbody>
       </table>
     </div>
+    ${canEdit ? `<p style="margin-top:10px;font-size:10px;color:var(--t3);">Clique em <strong>+ Serviço</strong> para adicionar serviços por profissional. Use <strong>✎</strong> para editar e <strong>✕</strong> para remover.</p>` : ''}
   </div>`;
 
   if (_priceSearch) {
@@ -295,33 +318,78 @@ function renderPriceTable() {
   }
 }
 
-function editPriceRow(id) {
-  const d = S.doctors.find(x => x.id === id);
-  if (!d) return;
-  const row = document.getElementById(`price-row-${id}`);
-  if (!row) return;
-  const nature = d.defaultNature || '—';
+function addPriceEntry(doctorId) {
+  if (!S.priceEntries) S.priceEntries = [];
+  const existing = document.getElementById('price-new-entry-form');
+  if (existing) existing.remove();
+
+  const entries = S.priceEntries.filter(e => e.doctorId === doctorId && e.unitId === S.currentUnit);
+  const anchor = entries.length
+    ? document.getElementById(`price-entry-${entries[entries.length - 1].id}`)
+    : document.getElementById(`price-doc-${doctorId}`);
+  if (!anchor) return;
+
+  const row = document.createElement('tr');
+  row.id = 'price-new-entry-form';
+  row.style.borderBottom = '2px solid var(--accent)';
+  row.style.background = 'rgba(79,142,247,0.07)';
   row.innerHTML = `
-    <td style="padding:10px 12px;font-weight:700;">${d.name}</td>
-    <td style="padding:10px 12px;color:var(--t2);font-style:italic;">${d.spec}</td>
-    <td style="padding:10px 12px;"><span style="font-size:9px;font-weight:800;text-transform:uppercase;background:var(--s3);padding:3px 7px;border-radius:3px;color:var(--t2);">${nature}</span></td>
-    <td style="padding:6px 12px;"><input type="text" class="inp" id="pt-pp-${id}" value="${d.priceParticular || ''}" placeholder="0,00" style="padding:6px 8px;width:100px;"></td>
-    <td style="padding:6px 12px;"><input type="text" class="inp" id="pt-pc-${id}" value="${d.priceCartao || ''}" placeholder="0,00" style="padding:6px 8px;width:100px;"></td>
-    <td style="padding:6px 12px;text-align:right;white-space:nowrap;">
-      <button class="btn btn-ghost" style="padding:5px 8px;font-size:10px;" onclick="renderPriceTable()">✕</button>
-      <button class="btn btn-primary" style="padding:5px 10px;font-size:10px;margin-left:4px;" onclick="savePriceRow('${id}')">✓ Salvar</button>
+    <td style="padding:8px 12px;color:var(--t3);font-size:11px;white-space:nowrap;">└ novo serviço</td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-label" placeholder="Ex: Clínico Geral" style="padding:6px 8px;width:150px;"></td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-pp" placeholder="Particular R$" style="padding:6px 8px;width:110px;"></td>
+    <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
+      <button class="btn btn-ghost" style="padding:5px 8px;font-size:10px;" onclick="document.getElementById('price-new-entry-form').remove()">✕</button>
+      <button class="btn btn-primary" style="padding:5px 10px;font-size:10px;margin-left:4px;" onclick="savePriceEntry('${doctorId}')">✓ Salvar</button>
     </td>`;
+  anchor.after(row);
+  setTimeout(() => document.getElementById('new-pe-label')?.focus(), 30);
 }
 
-function savePriceRow(id) {
-  const d = S.doctors.find(x => x.id === id);
-  if (!d) return;
-  const pp = document.getElementById(`pt-pp-${id}`)?.value.trim();
-  const pc = document.getElementById(`pt-pc-${id}`)?.value.trim();
-  d.priceParticular = pp || null;
-  d.priceCartao = pc || null;
+function savePriceEntry(doctorId) {
+  const label = document.getElementById('new-pe-label')?.value.trim();
+  if (!label) { showToast('INFORME O SERVIÇO OU ESPECIALIDADE'); return; }
+  if (!S.priceEntries) S.priceEntries = [];
+  const pp = document.getElementById('new-pe-pp')?.value.trim();
+  S.priceEntries.push({ id: 'pe_' + Date.now(), doctorId, unitId: S.currentUnit, label, priceParticular: pp || null, priceCartao: null });
   saveConfig();
-  showToast('VALORES ATUALIZADOS!');
+  showToast('SERVIÇO ADICIONADO!');
+  renderPriceTable();
+}
+
+function editPriceEntry(entryId) {
+  const e = (S.priceEntries || []).find(x => x.id === entryId);
+  if (!e) return;
+  const row = document.getElementById(`price-entry-${entryId}`);
+  if (!row) return;
+  row.style.background = 'rgba(79,142,247,0.07)';
+  row.innerHTML = `
+    <td style="padding:8px 12px;color:var(--t3);font-size:11px;">└</td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-label-${entryId}" value="${(e.label||'').replace(/"/g,'&quot;')}" placeholder="Serviço" style="padding:6px 8px;width:150px;"></td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-pp-${entryId}" value="${e.priceParticular||''}" placeholder="Particular R$" style="padding:6px 8px;width:110px;"></td>
+    <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
+      <button class="btn btn-ghost" style="padding:5px 8px;font-size:10px;" onclick="renderPriceTable()">✕</button>
+      <button class="btn btn-primary" style="padding:5px 10px;font-size:10px;margin-left:4px;" onclick="updatePriceEntry('${entryId}')">✓ Salvar</button>
+    </td>`;
+  setTimeout(() => document.getElementById(`edit-pe-label-${entryId}`)?.focus(), 30);
+}
+
+function updatePriceEntry(entryId) {
+  const e = (S.priceEntries || []).find(x => x.id === entryId);
+  if (!e) return;
+  const label = document.getElementById(`edit-pe-label-${entryId}`)?.value.trim();
+  if (!label) { showToast('INFORME O SERVIÇO OU ESPECIALIDADE'); return; }
+  e.label = label;
+  e.priceParticular = document.getElementById(`edit-pe-pp-${entryId}`)?.value.trim() || null;
+  saveConfig();
+  showToast('ENTRADA ATUALIZADA!');
+  renderPriceTable();
+}
+
+function deletePriceEntry(entryId) {
+  if (!confirm('Remover esta entrada?')) return;
+  S.priceEntries = (S.priceEntries || []).filter(x => x.id !== entryId);
+  saveConfig();
+  showToast('ENTRADA REMOVIDA!');
   renderPriceTable();
 }
 
@@ -387,10 +455,12 @@ async function init() {
     try {
         const { data: configRows, error: cfgErr } = await _supabase.from('mapa_config').select('*');
         if (!cfgErr && configRows && configRows.length > 0) {
-            const unitsRow   = configRows.find(r => r.id === 'units');
-            const doctorsRow = configRows.find(r => r.id === 'doctors');
-            if (unitsRow?.data)   S.units   = unitsRow.data;
-            if (doctorsRow?.data) S.doctors = doctorsRow.data;
+            const unitsRow        = configRows.find(r => r.id === 'units');
+            const doctorsRow      = configRows.find(r => r.id === 'doctors');
+            const priceEntriesRow = configRows.find(r => r.id === 'priceEntries');
+            if (unitsRow?.data)        S.units        = unitsRow.data;
+            if (doctorsRow?.data)      S.doctors      = doctorsRow.data;
+            if (priceEntriesRow?.data) S.priceEntries = priceEntriesRow.data;
         }
 
         // 3. Carregar slots do Supabase
