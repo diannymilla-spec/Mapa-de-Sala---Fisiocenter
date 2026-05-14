@@ -596,9 +596,11 @@ function slotHTML(slot, key, isMonthView) {
 
   let obsWarning = '';
   if (slot.obs) {
-      obsWarning = `<span class="obs-icon" title="Observação: ${slot.obs}">⚠️</span>`;
+      obsWarning = `<span class="obs-icon">⚠️</span>`;
       tooltip += `\nObservação: ${slot.obs}`;
   }
+
+  const safeTooltip = tooltip.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/\n/g, '&#10;');
 
   let displayNameFull = doc.name.replace(/^(Dr\.|Dra\.)\s+/i, '');
 
@@ -613,7 +615,7 @@ function slotHTML(slot, key, isMonthView) {
   }
 
   return `
-    <div class="mini-slot ${slot.status}" title="${tooltip}" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
+    <div class="mini-slot ${slot.status}" data-tip="${safeTooltip}" onclick="handleSlotClick(event,'${key}')" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
         ${obsWarning}
         ${nameHTML}
         ${(!isMonthView && tags.length > 0) ? `<div class="mini-tags">${tags.join('')}</div>` : ''}
@@ -1203,11 +1205,15 @@ function renderCfgBody(tab) {
                 <div class="form-group"><label class="form-label">Tipo de Atendimento</label><div class="toggle-group" id="tglType"><button class="tgl-btn active" onclick="setTgl('tglType',this,'hora')">Hora Marcada</button><button class="tgl-btn" onclick="setTgl('tglType',this,'ordem')">Ordem de Chegada</button></div></div>
                 <div class="form-group">
                     <label class="form-label">Natureza Padrão <span style="color:var(--t3);font-weight:400;text-transform:none;">(opcional — sobrepõe a agenda)</span></label>
-                    <div class="toggle-group" id="tglDefaultNature">
-                        <button class="tgl-btn active" onclick="setTglWithPrices('tglDefaultNature',this,'','newDocPrices')">Nenhuma</button>
-                        <button class="tgl-btn" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta','newDocPrices')">Consulta</button>
-                        <button class="tgl-btn" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta/Sessão','newDocPrices')">Consulta/Sessão</button>
-                        <button class="tgl-btn" onclick="setTglWithPrices('tglDefaultNature',this,'Procedimento','newDocPrices')">Procedimento</button>
+                    <div id="tglDefaultNature" style="display:flex;flex-direction:column;gap:6px;">
+                        <div style="display:flex;gap:6px;">
+                            <button class="tgl-btn active" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'','newDocPrices')">Nenhuma</button>
+                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta','newDocPrices')">Consulta</button>
+                        </div>
+                        <div style="display:flex;gap:6px;">
+                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta/Sessão','newDocPrices')">Consulta/Sessão</button>
+                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Procedimento','newDocPrices')">Procedimento</button>
+                        </div>
                     </div>
                 </div>
                 <div id="newDocPrices" style="display:none; background:var(--s1); border:1px solid var(--border); border-radius:4px; padding:10px; margin-top:-8px; margin-bottom:8px;">
@@ -1390,11 +1396,15 @@ function editDoctor(id) {
                 <button class="tgl-btn ${type === 'ordem' ? 'active' : ''}" data-val="ordem" onclick="setEditTgl('edit-tglType-${id}', this)">Ordem de Chegada</button>
             </div>
             <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;">Natureza Padrão <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
-            <div class="toggle-group" id="edit-tglDefNature-${id}">
-                <button class="tgl-btn ${defNature === '' ? 'active' : ''}" data-val="" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Nenhuma</button>
-                <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" data-val="Consulta" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta</button>
-                <button class="tgl-btn ${defNature === 'Consulta/Sessão' ? 'active' : ''}" data-val="Consulta/Sessão" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta/Sessão</button>
-                <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" data-val="Procedimento" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Procedimento</button>
+            <div id="edit-tglDefNature-${id}" style="display:flex;flex-direction:column;gap:6px;">
+                <div style="display:flex;gap:6px;">
+                    <button class="tgl-btn ${defNature === '' ? 'active' : ''}" style="flex:1" data-val="" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Nenhuma</button>
+                    <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" style="flex:1" data-val="Consulta" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta</button>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <button class="tgl-btn ${defNature === 'Consulta/Sessão' ? 'active' : ''}" style="flex:1" data-val="Consulta/Sessão" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta/Sessão</button>
+                    <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" style="flex:1" data-val="Procedimento" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Procedimento</button>
+                </div>
             </div>
             <div id="edit-prices-${id}" style="display:${(defNature === 'Consulta' || defNature === 'Consulta/Sessão') ? '' : 'none'}; background:var(--s1); border:1px solid var(--border); border-radius:4px; padding:10px; margin-top:4px;">
                 <label class="form-label" style="margin-bottom:8px; font-size:9px;">VALORES DE CONSULTA</label>
@@ -1411,10 +1421,10 @@ function editDoctor(id) {
             </div>
             ${convHtml}
             ${procHtml}
-        </div>
-        <div style="display:flex; flex-direction:column; gap:5px; margin-left:10px; align-items:center; justify-content:flex-start; padding-top:4px;">
-            <button class="btn btn-primary" style="padding:10px" onclick="saveDoctorEdit('${id}')" title="Salvar Alterações">✓</button>
-            <button class="btn btn-ghost" style="padding:10px" onclick="renderCfgBody('medicos')" title="Cancelar">✕</button>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+                <button class="btn btn-ghost" style="flex:1" onclick="renderCfgBody('medicos')">✕ Cancelar</button>
+                <button class="btn btn-primary" style="flex:1" onclick="saveDoctorEdit('${id}')">✓ Salvar</button>
+            </div>
         </div>
     `;
 }
@@ -1767,3 +1777,87 @@ function renderDashboard() {
 }
 
 init();
+
+// ── TOOLTIP CUSTOMIZADO ──
+let _tipPinned = false;
+
+function _showTip(text, x, y) {
+    if (_tipPinned) return;
+    const tt = document.getElementById('customTooltip');
+    const body = document.getElementById('customTooltipBody');
+    if (!tt || !body) return;
+    body.textContent = text;
+    tt.classList.remove('pinned');
+    document.getElementById('tooltipPin').style.display = 'none';
+    tt.style.display = 'block';
+    _moveTip(tt, x, y);
+}
+
+function _moveTip(tt, x, y) {
+    tt = tt || document.getElementById('customTooltip');
+    if (!tt || tt.style.display === 'none') return;
+    const w = tt.offsetWidth || 240;
+    const h = tt.offsetHeight || 100;
+    let left = x + 16;
+    let top  = y + 16;
+    if (left + w > window.innerWidth  - 8) left = x - w - 8;
+    if (top  + h > window.innerHeight - 8) top  = y - h - 8;
+    tt.style.left = Math.max(8, left) + 'px';
+    tt.style.top  = Math.max(8, top)  + 'px';
+}
+
+function _hideTip() {
+    if (_tipPinned) return;
+    const tt = document.getElementById('customTooltip');
+    if (tt) tt.style.display = 'none';
+}
+
+function _pinTip(text, x, y) {
+    _tipPinned = false;
+    _showTip(text, x, y);
+    _tipPinned = true;
+    const tt = document.getElementById('customTooltip');
+    if (!tt) return;
+    tt.classList.add('pinned');
+    document.getElementById('tooltipPin').style.display = 'inline';
+}
+
+function _dismissTip() {
+    _tipPinned = false;
+    const tt = document.getElementById('customTooltip');
+    if (tt) { tt.style.display = 'none'; tt.classList.remove('pinned'); }
+}
+
+function handleSlotClick(e, key) {
+    if (isEditActive(S.currentUnit)) return;
+    e.stopPropagation();
+    const slotEl = e.currentTarget;
+    const text = slotEl ? slotEl.getAttribute('data-tip') : null;
+    if (!text) return;
+    if (_tipPinned) { _dismissTip(); return; }
+    _pinTip(text, e.clientX, e.clientY);
+}
+
+document.addEventListener('mouseover', function(e) {
+    const slot = e.target.closest('.mini-slot[data-tip]');
+    if (!slot) return;
+    _showTip(slot.getAttribute('data-tip'), e.clientX, e.clientY);
+});
+
+document.addEventListener('mousemove', function(e) {
+    if (_tipPinned) return;
+    const slot = e.target.closest('.mini-slot[data-tip]');
+    if (slot) _moveTip(null, e.clientX, e.clientY);
+});
+
+document.addEventListener('mouseout', function(e) {
+    if (!e.target.closest('.mini-slot[data-tip]')) return;
+    const related = e.relatedTarget;
+    if (related && related.closest('.mini-slot[data-tip]') === e.target.closest('.mini-slot[data-tip]')) return;
+    _hideTip();
+});
+
+document.addEventListener('click', function(e) {
+    if (!_tipPinned) return;
+    if (!e.target.closest('.mini-slot[data-tip]')) _dismissTip();
+});

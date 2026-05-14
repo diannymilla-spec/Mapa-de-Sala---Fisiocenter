@@ -242,3 +242,33 @@ body.light-theme .mini-spec { color: var(--t3); }
 .day-card.diasuS .room-color-4 { background: rgba(253,224,71,0.75) !important; color: #713f12 !important; }
 .day-card.diasuS .cell-slot { background: rgba(254,240,138,0.45) !important; }
 .day-card.diasuS .cell-slot:has(.mini-slot) { background: transparent !important; }
+
+/* ── TOOLTIP CUSTOMIZADO ── */
+.custom-tooltip {
+    position: fixed;
+    z-index: 9999;
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--t1);
+    max-width: 260px;
+    pointer-events: none;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+    white-space: pre-line;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.custom-tooltip.pinned {
+    border-color: var(--accent);
+    box-shadow: 0 8px 28px rgba(79,142,247,0.3);
+    pointer-events: auto;
+}
+.tooltip-pin {
+    position: absolute;
+    top: 7px;
+    right: 9px;
+    font-size: 11px;
+    line-height: 1;
+}
