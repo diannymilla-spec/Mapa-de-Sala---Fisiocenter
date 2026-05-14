@@ -246,6 +246,23 @@ function renderPriceTable() {
     });
   }
 
+  // Auto-seed: médicos com Natureza=Consulta/C.Sessão e preços no perfil, mas sem entradas manuais ainda
+  let autoSeeded = false;
+  S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived).forEach(d => {
+    const hasEntries = S.priceEntries.some(e => e.doctorId === d.id && e.unitId === S.currentUnit);
+    if (!hasEntries && (d.defNature === 'Consulta' || d.defNature === 'Consulta/Sessão') && (d.priceParticular || d.priceCartao)) {
+      S.priceEntries.push({
+        id: 'pe_' + Date.now() + '_' + d.id,
+        doctorId: d.id, unitId: S.currentUnit,
+        label: d.spec || d.defNature,
+        priceParticular: d.priceParticular || null,
+        priceCartao:     d.priceCartao     || null
+      });
+      autoSeeded = true;
+    }
+  });
+  if (autoSeeded) saveConfig();
+
   const rows = doctors.map(d => {
     const entries = S.priceEntries.filter(e => e.doctorId === d.id && e.unitId === S.currentUnit);
 
@@ -255,6 +272,7 @@ function renderPriceTable() {
       return `<tr id="price-doc-${d.id}" style="border-bottom:2px solid var(--border);">
         <td style="padding:10px 12px;">${docHeader}</td>
         <td style="padding:10px 12px;color:var(--t3);font-size:11px;">—</td>
+        <td style="padding:10px 12px;color:var(--t3);">—</td>
         <td style="padding:10px 12px;color:var(--t3);">—</td>
         <td style="padding:6px 12px;text-align:right;">
           ${canEdit ? `<button class="btn btn-primary" style="padding:5px 10px;font-size:10px;" onclick="addPriceEntry('${d.id}')">+ Serviço</button>` : ''}
@@ -274,6 +292,7 @@ function renderPriceTable() {
         </td>
         <td style="padding:8px 12px;">${e.label || '—'}</td>
         <td style="padding:8px 12px;font-weight:700;color:${ppColor};">${pp}</td>
+        <td style="padding:8px 12px;font-weight:700;color:${pcColor};">${pc}</td>
         <td style="padding:6px 12px;text-align:right;white-space:nowrap;">
           ${canEdit ? `
             ${isLast ? `<button class="btn btn-primary" style="padding:4px 8px;font-size:10px;margin-right:2px;" onclick="addPriceEntry('${d.id}')">+</button>` : ''}
@@ -304,9 +323,10 @@ function renderPriceTable() {
           <th style="padding:10px 12px;min-width:180px;">Profissional</th>
           <th style="padding:10px 12px;">Serviço / Especialidade</th>
           <th style="padding:10px 12px;">Particular</th>
+          <th style="padding:10px 12px;">Cartão Fisiocenter</th>
           <th style="padding:10px 12px;width:${canEdit?'160px':'10px'};"></th>
         </tr></thead>
-        <tbody>${rows || `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--t3);">Nenhum profissional cadastrado nesta unidade.</td></tr>`}</tbody>
+        <tbody>${rows || `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--t3);">Nenhum profissional cadastrado nesta unidade.</td></tr>`}</tbody>
       </table>
     </div>
     ${canEdit ? `<p style="margin-top:10px;font-size:10px;color:var(--t3);">Clique em <strong>+ Serviço</strong> para adicionar serviços por profissional. Use <strong>✎</strong> para editar e <strong>✕</strong> para remover.</p>` : ''}
@@ -323,6 +343,12 @@ function addPriceEntry(doctorId) {
   const existing = document.getElementById('price-new-entry-form');
   if (existing) existing.remove();
 
+  const d = S.doctors.find(doc => doc.id === doctorId);
+  const isFirst = !S.priceEntries.some(e => e.doctorId === doctorId && e.unitId === S.currentUnit);
+  const defLabel = isFirst && d ? (d.spec || '') : '';
+  const defPP    = isFirst && d ? (d.priceParticular || '') : '';
+  const defPC    = isFirst && d ? (d.priceCartao     || '') : '';
+
   const entries = S.priceEntries.filter(e => e.doctorId === doctorId && e.unitId === S.currentUnit);
   const anchor = entries.length
     ? document.getElementById(`price-entry-${entries[entries.length - 1].id}`)
@@ -335,14 +361,15 @@ function addPriceEntry(doctorId) {
   row.style.background = 'rgba(79,142,247,0.07)';
   row.innerHTML = `
     <td style="padding:8px 12px;color:var(--t3);font-size:11px;white-space:nowrap;">└ novo serviço</td>
-    <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-label" placeholder="Ex: Clínico Geral" style="padding:6px 8px;width:150px;"></td>
-    <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-pp" placeholder="Particular R$" style="padding:6px 8px;width:110px;"></td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-label" value="${defLabel.replace(/"/g,'&quot;')}" placeholder="Ex: Clínico Geral" style="padding:6px 8px;width:150px;"></td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-pp" value="${defPP}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-pc" value="${defPC}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
     <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
       <button class="btn btn-ghost" style="padding:5px 8px;font-size:10px;" onclick="document.getElementById('price-new-entry-form').remove()">✕</button>
       <button class="btn btn-primary" style="padding:5px 10px;font-size:10px;margin-left:4px;" onclick="savePriceEntry('${doctorId}')">✓ Salvar</button>
     </td>`;
   anchor.after(row);
-  setTimeout(() => document.getElementById('new-pe-label')?.focus(), 30);
+  setTimeout(() => { const inp = document.getElementById('new-pe-label'); if(inp){ inp.focus(); inp.select(); } }, 30);
 }
 
 function savePriceEntry(doctorId) {
@@ -350,7 +377,8 @@ function savePriceEntry(doctorId) {
   if (!label) { showToast('INFORME O SERVIÇO OU ESPECIALIDADE'); return; }
   if (!S.priceEntries) S.priceEntries = [];
   const pp = document.getElementById('new-pe-pp')?.value.trim();
-  S.priceEntries.push({ id: 'pe_' + Date.now(), doctorId, unitId: S.currentUnit, label, priceParticular: pp || null, priceCartao: null });
+  const pc = document.getElementById('new-pe-pc')?.value.trim();
+  S.priceEntries.push({ id: 'pe_' + Date.now(), doctorId, unitId: S.currentUnit, label, priceParticular: pp || null, priceCartao: pc || null });
   saveConfig();
   showToast('SERVIÇO ADICIONADO!');
   renderPriceTable();
@@ -365,12 +393,13 @@ function editPriceEntry(entryId) {
   row.innerHTML = `
     <td style="padding:8px 12px;color:var(--t3);font-size:11px;">└</td>
     <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-label-${entryId}" value="${(e.label||'').replace(/"/g,'&quot;')}" placeholder="Serviço" style="padding:6px 8px;width:150px;"></td>
-    <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-pp-${entryId}" value="${e.priceParticular||''}" placeholder="Particular R$" style="padding:6px 8px;width:110px;"></td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-pp-${entryId}" value="${e.priceParticular||''}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
+    <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-pc-${entryId}" value="${e.priceCartao||''}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
     <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
       <button class="btn btn-ghost" style="padding:5px 8px;font-size:10px;" onclick="renderPriceTable()">✕</button>
       <button class="btn btn-primary" style="padding:5px 10px;font-size:10px;margin-left:4px;" onclick="updatePriceEntry('${entryId}')">✓ Salvar</button>
     </td>`;
-  setTimeout(() => document.getElementById(`edit-pe-label-${entryId}`)?.focus(), 30);
+  setTimeout(() => { const inp = document.getElementById(`edit-pe-label-${entryId}`); if(inp){ inp.focus(); inp.select(); } }, 30);
 }
 
 function updatePriceEntry(entryId) {
@@ -380,6 +409,7 @@ function updatePriceEntry(entryId) {
   if (!label) { showToast('INFORME O SERVIÇO OU ESPECIALIDADE'); return; }
   e.label = label;
   e.priceParticular = document.getElementById(`edit-pe-pp-${entryId}`)?.value.trim() || null;
+  e.priceCartao     = document.getElementById(`edit-pe-pc-${entryId}`)?.value.trim() || null;
   saveConfig();
   showToast('ENTRADA ATUALIZADA!');
   renderPriceTable();
