@@ -240,24 +240,35 @@ body.light-theme .mini-spec { color: var(--t3); }
   .logo { font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .unit-select { font-size: 11px; padding: 4px 8px; }
 
-  /* Linha 2: todos os botões da direita, scroll horizontal se necessário */
+  /* Linha 2: botões de view + ações utilitárias (theme, buscar, config) */
   .tb-right {
     order: 10;
     width: 100%;
     gap: 5px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    flex-wrap: wrap;
+    align-items: center;
   }
-  .tb-right::-webkit-scrollbar { display: none; }
 
-  /* Botões de view menores */
-  .vs-btn { padding: 4px 7px; font-size: 9px; white-space: nowrap; }
+  /* View switch: ocupa toda a largura na linha 2 */
+  .tb-right .view-switch {
+    order: 2;
+    width: 100%;
+    gap: 3px;
+  }
+  .vs-btn { flex: 1; padding: 7px 3px; font-size: 9px; white-space: nowrap; }
 
-  /* Nav label mais curto */
-  .nav-label { min-width: 80px; font-size: 9px; }
+  /* Nav group (‹ HOJE label ›): linha 3, centralizado */
+  .tb-right #navGroup {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
 
-  /* Botão Buscar: só ícone */
+  /* Nav label: cabe bem no mobile com a width total */
+  .nav-label { min-width: 120px; font-size: 10px; text-align: center; }
+
+  /* Botões utilitários (theme 🌓, config ⚙): ficam na linha dos outros order-0 */
+  /* Botão Buscar: só ícone, ocupa espaço mínimo */
   .mass-btn span { display: none; }
 
   /* Conteúdo */
