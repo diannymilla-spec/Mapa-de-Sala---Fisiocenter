@@ -755,9 +755,9 @@ function slotHTML(slot, key, isMonthView) {
   }
 
   return `
-    <div class="mini-slot ${slot.status}" data-tip="${safeTooltip}" onclick="handleSlotClick(event,'${key}')" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
+    <div class="mini-slot ${slot.status}" onclick="handleSlotClick(event,'${key}')" draggable="${draggableAttr}" ondragstart="handleDragStart(event, '${key}')">
         ${obsWarning}
-        ${nameHTML}
+        <span class="doc-name-tip" data-tip="${safeTooltip}" onclick="handleNameTipClick(event,'${key}')">${nameHTML}</span>
         ${(!isMonthView && tags.length > 0) ? `<div class="mini-tags">${tags.join('')}</div>` : ''}
     </div>`;
 }
@@ -2056,33 +2056,20 @@ function _dismissTip() {
 function handleSlotClick(e, key) {
     if (isEditActive(S.currentUnit)) return;
     e.stopPropagation();
-    const slotEl = e.currentTarget;
-    const text = slotEl ? slotEl.getAttribute('data-tip') : null;
+    if (_tipPinned) _dismissTip();
+}
+
+function handleNameTipClick(e, key) {
+    if (isEditActive(S.currentUnit)) return; // deixa borbulhar para handleSlotClick → openAlloc
+    e.stopPropagation();
+    const nameEl = e.currentTarget;
+    const text = nameEl ? nameEl.getAttribute('data-tip') : null;
     if (!text) return;
     if (_tipPinned) { _dismissTip(); return; }
     _pinTip(text, e.clientX, e.clientY);
 }
 
-document.addEventListener('mouseover', function(e) {
-    const slot = e.target.closest('.mini-slot[data-tip]');
-    if (!slot) return;
-    _showTip(slot.getAttribute('data-tip'), e.clientX, e.clientY);
-});
-
-document.addEventListener('mousemove', function(e) {
-    if (_tipPinned) return;
-    const slot = e.target.closest('.mini-slot[data-tip]');
-    if (slot) _moveTip(null, e.clientX, e.clientY);
-});
-
-document.addEventListener('mouseout', function(e) {
-    if (!e.target.closest('.mini-slot[data-tip]')) return;
-    const related = e.relatedTarget;
-    if (related && related.closest('.mini-slot[data-tip]') === e.target.closest('.mini-slot[data-tip]')) return;
-    _hideTip();
-});
-
 document.addEventListener('click', function(e) {
     if (!_tipPinned) return;
-    if (!e.target.closest('.mini-slot[data-tip]')) _dismissTip();
+    if (!e.target.closest('.doc-name-tip[data-tip]')) _dismissTip();
 });

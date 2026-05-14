@@ -272,3 +272,11 @@ body.light-theme .mini-spec { color: var(--t3); }
     font-size: 11px;
     line-height: 1;
 }
+.doc-name-tip {
+    cursor: pointer;
+    display: contents;
+}
+.doc-name-tip:hover .mini-name,
+.doc-name-tip:hover .mini-spec {
+    text-decoration: underline dotted rgba(255,255,255,0.4);
+}
