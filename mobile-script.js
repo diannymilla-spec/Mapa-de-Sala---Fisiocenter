@@ -359,10 +359,10 @@ function buildBottomNav(isEdit) {
     <div onclick="mobileMoreOpen=false; renderMain();"
          style="position:fixed;inset:0;z-index:100;"></div>
     <div id="mobileMoreMenu" style="
-      position:fixed; top:112px; right:8px;
+      position:fixed; bottom:64px; right:8px;
       background:var(--s2); border:1px solid var(--border);
       border-radius:12px; min-width:200px;
-      box-shadow:0 4px 24px rgba(0,0,0,0.5);
+      box-shadow:0 -4px 24px rgba(0,0,0,0.5);
       z-index:101; overflow:hidden;">
       <button onclick="goToMobileToday(); mobileMoreOpen=false; renderMain();"
               style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
