@@ -504,8 +504,11 @@ function showMobileSlotDetail(key) {
             const nature  = slot.nature || doc.defNature || 'Consulta';
             const typeTxt = doc.type === 'hora' ? 'Hora Marcada' : 'Ordem de Chegada';
 
-            // Preços: Tabela de Preços tem prioridade; fallback no perfil do médico
-            const _peList = (S.priceEntries || []).filter(e => e.doctorId === doc.id && e.unitId === S.currentUnit);
+            // Preços: Tabela de Preços filtrada pela natureza do slot; fallback no perfil do médico
+            const _peList = (S.priceEntries || []).filter(e =>
+                e.doctorId === doc.id && e.unitId === S.currentUnit &&
+                (!e.nature || !nature || e.nature === nature)
+            );
             let pricesHTML = '';
             if (_peList.length > 0) {
                 pricesHTML = _peList.map(e => {
@@ -520,7 +523,7 @@ function showMobileSlotDetail(key) {
                       </div>
                     </div>`;
                 }).join('');
-            } else {
+            } else if (nature === 'Consulta' || nature === 'Consulta/Sessão' || !nature) {
                 const pp = doc.priceParticular ? fmtPrice(doc.priceParticular) : null;
                 const pc = doc.priceCartao     ? fmtPrice(doc.priceCartao)     : null;
                 if (pp || pc) {

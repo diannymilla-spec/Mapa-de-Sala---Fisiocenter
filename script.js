@@ -255,6 +255,7 @@ function renderPriceTable() {
         id: 'pe_' + Date.now() + '_' + d.id,
         doctorId: d.id, unitId: S.currentUnit,
         label: d.spec || d.defNature,
+        nature: d.defNature || null,
         priceParticular: d.priceParticular || null,
         priceCartao:     d.priceCartao     || null
       });
@@ -286,11 +287,12 @@ function renderPriceTable() {
       const ppColor = e.priceParticular ? 'var(--active)' : 'var(--t3)';
       const pcColor = e.priceCartao     ? 'var(--active)' : 'var(--t3)';
       const isLast = idx === entries.length - 1;
+      const natureBadge = e.nature ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;margin-left:5px;vertical-align:middle;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>` : '';
       return `<tr id="price-entry-${e.id}" style="border-bottom:${isLast ? '2px solid var(--border)' : '1px solid rgba(255,255,255,0.05)'};">
         <td style="padding:${idx===0?'10px':'6px'} 12px;vertical-align:${idx===0?'top':'middle'};">
           ${idx===0 ? docHeader : '<span style="color:var(--t3);padding-left:6px;">└</span>'}
         </td>
-        <td style="padding:8px 12px;">${e.label || '—'}</td>
+        <td style="padding:8px 12px;">${e.label || '—'}${natureBadge}</td>
         <td style="padding:8px 12px;font-weight:700;color:${ppColor};">${pp}</td>
         <td style="padding:8px 12px;font-weight:700;color:${pcColor};">${pc}</td>
         <td style="padding:6px 12px;text-align:right;white-space:nowrap;">
@@ -345,9 +347,18 @@ function addPriceEntry(doctorId) {
 
   const d = S.doctors.find(doc => doc.id === doctorId);
   const isFirst = !S.priceEntries.some(e => e.doctorId === doctorId && e.unitId === S.currentUnit);
-  const defLabel = isFirst && d ? (d.spec || '') : '';
-  const defPP    = isFirst && d ? (d.priceParticular || '') : '';
-  const defPC    = isFirst && d ? (d.priceCartao     || '') : '';
+  const defLabel  = isFirst && d ? (d.spec || '') : '';
+  const defPP     = isFirst && d ? (d.priceParticular || '') : '';
+  const defPC     = isFirst && d ? (d.priceCartao     || '') : '';
+  const defNature = (isFirst && d?.defNature) ? d.defNature : '';
+
+  const _natureSel = (val) => `
+    <select id="new-pe-nature" class="sel" style="padding:5px 6px;font-size:10px;margin-top:4px;width:130px;">
+      <option value="" ${val===''?'selected':''}>Todos (sem filtro)</option>
+      <option value="Consulta" ${val==='Consulta'?'selected':''}>Consulta</option>
+      <option value="Consulta/Sessão" ${val==='Consulta/Sessão'?'selected':''}>Consulta/Sessão</option>
+      <option value="Procedimento" ${val==='Procedimento'?'selected':''}>Procedimento</option>
+    </select>`;
 
   const entries = S.priceEntries.filter(e => e.doctorId === doctorId && e.unitId === S.currentUnit);
   const anchor = entries.length
@@ -361,7 +372,10 @@ function addPriceEntry(doctorId) {
   row.style.background = 'rgba(79,142,247,0.07)';
   row.innerHTML = `
     <td style="padding:8px 12px;color:var(--t3);font-size:11px;white-space:nowrap;">└ novo serviço</td>
-    <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-label" value="${defLabel.replace(/"/g,'&quot;')}" placeholder="Ex: Clínico Geral" style="padding:6px 8px;width:150px;"></td>
+    <td style="padding:6px 8px;">
+      <input type="text" class="inp" id="new-pe-label" value="${defLabel.replace(/"/g,'&quot;')}" placeholder="Ex: Clínico Geral" style="padding:6px 8px;width:150px;">
+      ${_natureSel(defNature)}
+    </td>
     <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-pp" value="${defPP}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
     <td style="padding:6px 8px;"><input type="text" class="inp" id="new-pe-pc" value="${defPC}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
     <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
@@ -378,7 +392,8 @@ function savePriceEntry(doctorId) {
   if (!S.priceEntries) S.priceEntries = [];
   const pp = document.getElementById('new-pe-pp')?.value.trim();
   const pc = document.getElementById('new-pe-pc')?.value.trim();
-  S.priceEntries.push({ id: 'pe_' + Date.now(), doctorId, unitId: S.currentUnit, label, priceParticular: pp || null, priceCartao: pc || null });
+  const nature = document.getElementById('new-pe-nature')?.value || null;
+  S.priceEntries.push({ id: 'pe_' + Date.now(), doctorId, unitId: S.currentUnit, label, nature: nature || null, priceParticular: pp || null, priceCartao: pc || null });
   saveConfig();
   showToast('SERVIÇO ADICIONADO!');
   renderPriceTable();
@@ -389,10 +404,21 @@ function editPriceEntry(entryId) {
   if (!e) return;
   const row = document.getElementById(`price-entry-${entryId}`);
   if (!row) return;
+  const curNature = e.nature || '';
+  const _editNatureSel = `
+    <select id="edit-pe-nature-${entryId}" class="sel" style="padding:5px 6px;font-size:10px;margin-top:4px;width:130px;">
+      <option value="" ${curNature===''?'selected':''}>Todos (sem filtro)</option>
+      <option value="Consulta" ${curNature==='Consulta'?'selected':''}>Consulta</option>
+      <option value="Consulta/Sessão" ${curNature==='Consulta/Sessão'?'selected':''}>Consulta/Sessão</option>
+      <option value="Procedimento" ${curNature==='Procedimento'?'selected':''}>Procedimento</option>
+    </select>`;
   row.style.background = 'rgba(79,142,247,0.07)';
   row.innerHTML = `
     <td style="padding:8px 12px;color:var(--t3);font-size:11px;">└</td>
-    <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-label-${entryId}" value="${(e.label||'').replace(/"/g,'&quot;')}" placeholder="Serviço" style="padding:6px 8px;width:150px;"></td>
+    <td style="padding:6px 8px;">
+      <input type="text" class="inp" id="edit-pe-label-${entryId}" value="${(e.label||'').replace(/"/g,'&quot;')}" placeholder="Serviço" style="padding:6px 8px;width:150px;">
+      ${_editNatureSel}
+    </td>
     <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-pp-${entryId}" value="${e.priceParticular||''}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
     <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-pc-${entryId}" value="${e.priceCartao||''}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
     <td style="padding:6px 8px;text-align:right;white-space:nowrap;">
@@ -408,6 +434,7 @@ function updatePriceEntry(entryId) {
   const label = document.getElementById(`edit-pe-label-${entryId}`)?.value.trim();
   if (!label) { showToast('INFORME O SERVIÇO OU ESPECIALIDADE'); return; }
   e.label = label;
+  e.nature = document.getElementById(`edit-pe-nature-${entryId}`)?.value || null;
   e.priceParticular = document.getElementById(`edit-pe-pp-${entryId}`)?.value.trim() || null;
   e.priceCartao     = document.getElementById(`edit-pe-pc-${entryId}`)?.value.trim() || null;
   saveConfig();
@@ -729,8 +756,11 @@ function slotHTML(slot, key, isMonthView) {
   const typeDisplay = typeTxt === 'hora' ? 'Hora Marcada' : 'Ordem de Chegada';
   let tooltip = `${doc.name}\nEspecialidade: ${doc.spec}\nNatureza: ${natureTxt}\nAtendimento: ${typeDisplay}`;
 
-  // Preços: prioriza entradas da Tabela de Preços, cai no perfil do médico como fallback
-  const _peEntries = (S.priceEntries || []).filter(e => e.doctorId === doc.id && e.unitId === S.currentUnit);
+  // Preços: prioriza entradas da Tabela de Preços filtradas pela natureza do slot
+  const _peEntries = (S.priceEntries || []).filter(e =>
+    e.doctorId === doc.id && e.unitId === S.currentUnit &&
+    (!e.nature || !natureTxt || e.nature === natureTxt)
+  );
   if (_peEntries.length > 0) {
       _peEntries.forEach(e => {
           const pp = e.priceParticular ? fmtPrice(e.priceParticular) : null;
@@ -739,7 +769,7 @@ function slotHTML(slot, key, isMonthView) {
           if (pp) tooltip += `\n${lbl}Particular: ${pp}`;
           if (pc) tooltip += `\n${lbl}Cartão Fisiocenter: ${pc}`;
       });
-  } else if (doc.priceParticular || doc.priceCartao) {
+  } else if ((natureTxt === 'Consulta' || natureTxt === 'Consulta/Sessão' || !natureTxt) && (doc.priceParticular || doc.priceCartao)) {
       if (doc.priceParticular) tooltip += `\nParticular: ${fmtPrice(doc.priceParticular)}`;
       if (doc.priceCartao) tooltip += `\nCartão Fisiocenter: ${fmtPrice(doc.priceCartao)}`;
   }
@@ -1694,6 +1724,16 @@ function saveDoctorEdit(id) {
             const pc = document.getElementById(`edit-price-cartao-${id}`)?.value.trim();
             d.priceParticular = pp || null;
             d.priceCartao = pc || null;
+            // Auto-sync: create or update priceEntry matching this nature
+            if (!S.priceEntries) S.priceEntries = [];
+            const existing = S.priceEntries.find(e => e.doctorId === id && e.unitId === S.currentUnit && e.nature === defaultNature);
+            if (existing) {
+                existing.label = d.spec || defaultNature;
+                existing.priceParticular = d.priceParticular;
+                existing.priceCartao = d.priceCartao;
+            } else if (d.priceParticular || d.priceCartao) {
+                S.priceEntries.push({ id: 'pe_' + Date.now(), doctorId: id, unitId: S.currentUnit, label: d.spec || defaultNature, nature: defaultNature, priceParticular: d.priceParticular, priceCartao: d.priceCartao });
+            }
         } else {
             d.priceParticular = null;
             d.priceCartao = null;
