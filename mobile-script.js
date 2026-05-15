@@ -124,14 +124,13 @@ function buildDayStrip() {
 
     html += `
       <div class="mobile-week-nav"><button onclick="mobileNextWeek()">›</button></div>
-      <button onclick="mobileMoreOpen=!mobileMoreOpen; renderMain();"
-              style="width:32px;height:32px;background:${mobileMoreOpen ? 'var(--accent)' : 'var(--s3)'};
+      <button onclick="mobileMoreOpen=false; openSearch();"
+              style="width:32px;height:32px;background:var(--s3);
                      border:1px solid var(--border);border-radius:8px;
-                     color:${mobileMoreOpen ? '#fff' : 'var(--t2)'};
-                     font-size:17px;font-weight:900;cursor:pointer;flex-shrink:0;
+                     color:var(--t2);font-size:16px;cursor:pointer;flex-shrink:0;
                      display:flex;align-items:center;justify-content:center;
                      margin:4px 2px;-webkit-tap-highlight-color:transparent;">
-        ≡
+        🔍
       </button>
     </div>`;
     return html;
@@ -405,9 +404,10 @@ function buildBottomNav(isEdit) {
         <span class="nav-icon">🗓</span>
         <span class="nav-label">Mês</span>
       </button>
-      <button class="mobile-nav-btn" onclick="mobileMoreOpen=false; openSearch();">
-        <span class="nav-icon">🔍</span>
-        <span class="nav-label">Buscar</span>
+      <button class="mobile-nav-btn ${mobileMoreOpen ? 'active' : ''}"
+              onclick="mobileMoreOpen=!mobileMoreOpen; renderMain();">
+        <span class="nav-icon" style="font-size:18px;line-height:1.2;">≡</span>
+        <span class="nav-label">Mais</span>
       </button>
     </nav>`;
 }
