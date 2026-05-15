@@ -1753,12 +1753,25 @@ function editDoctor(id) {
             <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;">Natureza Padrão <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
             <div id="edit-tglDefNature-${id}" style="display:flex;flex-direction:column;gap:6px;">
                 <div style="display:flex;gap:6px;">
-                    <button class="tgl-btn ${defNature === '' ? 'active' : ''}" style="flex:1" data-val="" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Nenhuma</button>
-                    <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" style="flex:1" data-val="Consulta" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Consulta</button>
+                    <button class="tgl-btn ${defNature === '' ? 'active' : ''}" style="flex:1" data-val="" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Nenhuma</button>
+                    <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" style="flex:1" data-val="Consulta" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta</button>
                 </div>
                 <div style="display:flex;gap:6px;">
-                    <button class="tgl-btn ${defNature === 'Consulta/Sessão' ? 'active' : ''}" style="flex:1" data-val="Consulta/Sessão" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Consulta/Sessão</button>
-                    <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" style="flex:1" data-val="Procedimento" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Procedimento</button>
+                    <button class="tgl-btn ${defNature === 'Consulta/Sessão' ? 'active' : ''}" style="flex:1" data-val="Consulta/Sessão" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta/Sessão</button>
+                    <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" style="flex:1" data-val="Procedimento" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Procedimento</button>
+                </div>
+            </div>
+            <div id="edit-prices-${id}" style="display:${(defNature === 'Consulta' || defNature === 'Consulta/Sessão') ? '' : 'none'}; background:var(--s1); border:1px solid var(--border); border-radius:4px; padding:10px; margin-top:4px;">
+                <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:8px;text-transform:uppercase;">Valores de Consulta</label>
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">PARTICULAR (R$)</label>
+                        <input type="text" class="inp" id="edit-price-particular-${id}" value="${d.priceParticular || ''}" placeholder="0,00" style="padding:6px 8px;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">CARTÃO FISIOCENTER (R$)</label>
+                        <input type="text" class="inp" id="edit-price-cartao-${id}" value="${d.priceCartao || ''}" placeholder="0,00" style="padding:6px 8px;">
+                    </div>
                 </div>
             </div>
             <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-top:4px;display:block;">Especialidades e Valores</label>
@@ -1773,7 +1786,7 @@ function editDoctor(id) {
             </div>
         </div>
     `;
-    setTimeout(() => initDocEntries(id), 30);
+    setTimeout(() => initDocEntries(id), 100);
 }
 
 function saveDoctorEdit(id) {
