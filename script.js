@@ -312,7 +312,7 @@ function renderPriceTable() {
         <td style="padding:${idx===0?'10px':'6px'} 12px;vertical-align:${idx===0?'top':'middle'};">
           <div style="font-weight:700;">${d.name}</div><div style="font-size:10px;color:var(--t3);font-style:italic;">${e.label || d.spec}</div>
         </td>
-        <td style="padding:8px 12px;">${e.label || '—'}${natureBadge}</td>
+        <td style="padding:8px 12px;">${e.serviceLabel || e.label || '—'}${natureBadge}</td>
         <td style="padding:8px 12px;font-weight:700;color:${ppColor};">${pp}</td>
         <td style="padding:8px 12px;font-weight:700;color:${pcColor};">${pc}</td>
         <td style="padding:6px 12px;text-align:right;white-space:nowrap;">
@@ -422,9 +422,11 @@ function savePriceEntry(doctorId) {
 function editPriceEntry(entryId) {
   const e = (S.priceEntries || []).find(x => x.id === entryId);
   if (!e) return;
+  const d = S.doctors.find(x => x.id === e.doctorId);
   const row = document.getElementById(`price-entry-${entryId}`);
   if (!row) return;
   const curNature = e.nature || '';
+  const curServiceLabel = e.serviceLabel || e.label || '';
   const _editNatureSel = `
     <select id="edit-pe-nature-${entryId}" class="sel" style="padding:5px 6px;font-size:10px;margin-top:4px;width:130px;">
       <option value="" ${curNature===''?'selected':''}>Todos (sem filtro)</option>
@@ -434,9 +436,13 @@ function editPriceEntry(entryId) {
     </select>`;
   row.style.background = 'rgba(79,142,247,0.07)';
   row.innerHTML = `
-    <td style="padding:8px 12px;color:var(--t3);font-size:11px;">└</td>
+    <td style="padding:8px 12px;">
+      <div style="font-weight:700;font-size:13px;">${d ? d.name : ''}</div>
+      <div style="font-size:10px;color:var(--t3);font-style:italic;">${e.label || ''}</div>
+    </td>
     <td style="padding:6px 8px;">
-      <input type="text" class="inp" id="edit-pe-label-${entryId}" value="${(e.label||'').replace(/"/g,'&quot;')}" placeholder="Serviço" style="padding:6px 8px;width:150px;">
+      <label style="font-size:8px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Nome na tabela (personalizável)</label>
+      <input type="text" class="inp" id="edit-pe-serviceLabel-${entryId}" value="${curServiceLabel.replace(/"/g,'&quot;')}" placeholder="${(e.label||'').replace(/"/g,'&quot;')}" style="padding:6px 8px;width:160px;">
       ${_editNatureSel}
     </td>
     <td style="padding:6px 8px;"><input type="text" class="inp" id="edit-pe-pp-${entryId}" value="${e.priceParticular||''}" placeholder="R$" style="padding:6px 8px;width:90px;"></td>
@@ -445,15 +451,15 @@ function editPriceEntry(entryId) {
       <button class="btn btn-ghost" style="padding:5px 8px;font-size:10px;" onclick="renderPriceTable()">✕</button>
       <button class="btn btn-primary" style="padding:5px 10px;font-size:10px;margin-left:4px;" onclick="updatePriceEntry('${entryId}')">✓ Salvar</button>
     </td>`;
-  setTimeout(() => { const inp = document.getElementById(`edit-pe-label-${entryId}`); if(inp){ inp.focus(); inp.select(); } }, 30);
+  setTimeout(() => { const inp = document.getElementById(`edit-pe-serviceLabel-${entryId}`); if(inp){ inp.focus(); inp.select(); } }, 30);
 }
 
 function updatePriceEntry(entryId) {
   const e = (S.priceEntries || []).find(x => x.id === entryId);
   if (!e) return;
-  const label = document.getElementById(`edit-pe-label-${entryId}`)?.value.trim();
-  if (!label) { showToast('INFORME O SERVIÇO OU ESPECIALIDADE'); return; }
-  e.label = label;
+  const newServiceLabel = document.getElementById(`edit-pe-serviceLabel-${entryId}`)?.value.trim();
+  // serviceLabel personaliza apenas a coluna Serviço; e.label (cadastro original) não muda
+  e.serviceLabel = (newServiceLabel && newServiceLabel !== e.label) ? newServiceLabel : null;
   e.nature = document.getElementById(`edit-pe-nature-${entryId}`)?.value || null;
   e.priceParticular = document.getElementById(`edit-pe-pp-${entryId}`)?.value.trim() || null;
   e.priceCartao     = document.getElementById(`edit-pe-pc-${entryId}`)?.value.trim() || null;
