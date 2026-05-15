@@ -122,7 +122,17 @@ function buildDayStrip() {
         </div>`;
     }
 
-    html += `<div class="mobile-week-nav"><button onclick="mobileNextWeek()">›</button></div>
+    html += `
+      <div class="mobile-week-nav"><button onclick="mobileNextWeek()">›</button></div>
+      <button onclick="mobileMoreOpen=!mobileMoreOpen; renderMain();"
+              style="width:32px;height:32px;background:${mobileMoreOpen ? 'var(--accent)' : 'var(--s3)'};
+                     border:1px solid var(--border);border-radius:8px;
+                     color:${mobileMoreOpen ? '#fff' : 'var(--t2)'};
+                     font-size:17px;font-weight:900;cursor:pointer;flex-shrink:0;
+                     display:flex;align-items:center;justify-content:center;
+                     margin:4px 2px;-webkit-tap-highlight-color:transparent;">
+        ≡
+      </button>
     </div>`;
     return html;
 }
@@ -348,12 +358,12 @@ function buildBottomNav(isEdit) {
     const canInstall = !isStandalone() && !!_pwaInstallPrompt;
     const moreMenu = mobileMoreOpen ? `
     <div onclick="mobileMoreOpen=false; renderMain();"
-         style="position:fixed;inset:0;bottom:60px;z-index:100;"></div>
+         style="position:fixed;inset:0;z-index:100;"></div>
     <div id="mobileMoreMenu" style="
-      position:fixed; bottom:60px; right:0;
+      position:fixed; top:112px; right:8px;
       background:var(--s2); border:1px solid var(--border);
-      border-radius:12px 12px 0 0; min-width:200px;
-      box-shadow:0 -4px 24px rgba(0,0,0,0.5);
+      border-radius:12px; min-width:200px;
+      box-shadow:0 4px 24px rgba(0,0,0,0.5);
       z-index:101; overflow:hidden;">
       <button onclick="goToMobileToday(); mobileMoreOpen=false; renderMain();"
               style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
@@ -398,11 +408,6 @@ function buildBottomNav(isEdit) {
       <button class="mobile-nav-btn" onclick="mobileMoreOpen=false; openSearch();">
         <span class="nav-icon">🔍</span>
         <span class="nav-label">Buscar</span>
-      </button>
-      <button class="mobile-nav-btn ${mobileMoreOpen ? 'active' : ''}"
-              onclick="mobileMoreOpen=!mobileMoreOpen; renderMain();">
-        <span class="nav-icon" style="font-size:18px;line-height:1.2;">≡</span>
-        <span class="nav-label">Mais</span>
       </button>
     </nav>`;
 }
