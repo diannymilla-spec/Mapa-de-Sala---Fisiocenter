@@ -1,0 +1,330 @@
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE-FIRST EXPERIENCE  ≤768px
+   Coexiste com style.css sem alterar nada do desktop.
+═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ── Reset de scroll para scroll nativo no mobile ── */
+  body   { overflow: auto !important; height: auto !important; }
+  .content { overflow: visible !important; flex: none !important; }
+
+  /* ── Esconde interface desktop ── */
+  .topbar       { display: none !important; }
+  .mass-toolbar { display: none !important; }
+  #mainContent  { display: none !important; }
+
+  /* ══════════════════════════════════════════════════════════
+     TOPBAR MOBILE (fixa, 56px)
+  ══════════════════════════════════════════════════════════ */
+  .mobile-topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    height: 56px;
+    background: var(--s1);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 10px;
+  }
+
+  .mobile-topbar-title {
+    flex: 1;
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-unit-badge {
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: rgba(79,142,247,0.12);
+    border: 1px solid rgba(79,142,247,0.3);
+    border-radius: 4px;
+    padding: 4px 9px;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-topbar-btn {
+    width: 36px; height: 36px;
+    background: var(--s3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--t2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+  }
+  .mobile-topbar-btn:active { background: var(--s4); }
+  .mobile-topbar-btn.edit-active { color: var(--active); background: rgba(62,207,142,0.1); border-color: var(--active); }
+
+  /* ── Wrapper principal: espaça para topbar + bottom nav ── */
+  .mobile-content-wrapper {
+    padding-top: 56px;
+    padding-bottom: 68px;
+    min-height: 100vh;
+    background: var(--bg);
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     BARRA DE NAVEGAÇÃO INFERIOR
+  ══════════════════════════════════════════════════════════ */
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 100;
+    height: 60px;
+    background: var(--s1);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: stretch;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: transparent;
+    border: none;
+    color: var(--t3);
+    cursor: pointer;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s;
+    padding: 0;
+  }
+  .mobile-nav-btn .nav-icon { font-size: 20px; line-height: 1; }
+  .mobile-nav-btn .nav-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1; }
+  .mobile-nav-btn.active { color: var(--accent); }
+
+  /* ══════════════════════════════════════════════════════════
+     CARROSSEL DE DIAS
+  ══════════════════════════════════════════════════════════ */
+  .mobile-day-strip {
+    display: flex;
+    align-items: center;
+    background: var(--s1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 6px;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    position: sticky;
+    top: 56px;
+    z-index: 90;
+  }
+  .mobile-day-strip::-webkit-scrollbar { display: none; }
+
+  .mobile-day-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 8px 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    min-width: 42px;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .mobile-day-chip .chip-dow {
+    font-size: 8px; font-weight: 900; text-transform: uppercase;
+    color: var(--t3); letter-spacing: 0.4px;
+  }
+  .mobile-day-chip .chip-num {
+    font-size: 18px; font-weight: 700; color: var(--t2);
+    line-height: 1.2; font-family: 'Fraunces', serif;
+  }
+  .mobile-day-chip.today .chip-num { color: var(--accent); }
+  .mobile-day-chip.today::after {
+    content: ''; position: absolute; bottom: 4px;
+    width: 4px; height: 4px; background: var(--accent); border-radius: 50%;
+  }
+  .mobile-day-chip.selected { background: var(--accent); }
+  .mobile-day-chip.selected .chip-dow,
+  .mobile-day-chip.selected .chip-num { color: white; }
+  .mobile-day-chip.selected::after { background: white; }
+
+  .mobile-week-nav button {
+    width: 30px; height: 30px;
+    background: var(--s3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--t2);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin: 4px 2px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     VISÃO DO DIA
+  ══════════════════════════════════════════════════════════ */
+  .mobile-day-view { padding: 12px 10px 0; }
+
+  .mobile-day-title {
+    font-size: 10px; font-weight: 900; text-transform: uppercase;
+    color: var(--t3); letter-spacing: 1px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mobile-day-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .mobile-rooms-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .mobile-room-card {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .mobile-room-header {
+    padding: 5px 8px;
+    font-size: 8px; font-weight: 900; text-transform: uppercase;
+    letter-spacing: 0.5px; text-align: center;
+  }
+
+  /* Cores dos headers (mesmo padrão do desktop) */
+  .mobile-room-card:nth-child(5n+1) .mobile-room-header { background: #fef08a; color: #854d0e; }
+  .mobile-room-card:nth-child(5n+2) .mobile-room-header { background: #bbf7d0; color: #166534; }
+  .mobile-room-card:nth-child(5n+3) .mobile-room-header { background: #fed7aa; color: #9a3412; }
+  .mobile-room-card:nth-child(5n+4) .mobile-room-header { background: #ddd6fe; color: #5b21b6; }
+  .mobile-room-card:nth-child(5n+5) .mobile-room-header { background: #fecaca; color: #991b1b; }
+
+  .mobile-room-slots { display: flex; flex-direction: column; }
+
+  /* Slot individual */
+  .mobile-slot {
+    padding: 8px 8px;
+    min-height: 68px;
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    border-top: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .mobile-slot:first-child { border-top: none; }
+  .mobile-slot:active { background: rgba(255,255,255,0.04); }
+
+  .mobile-slot-period {
+    font-size: 7px; font-weight: 900; text-transform: uppercase;
+    color: var(--t3); letter-spacing: 0.5px;
+  }
+  .mobile-slot-name {
+    font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.2;
+  }
+  .mobile-slot-spec {
+    font-size: 8px; color: var(--t2); font-style: italic;
+  }
+  .mobile-slot-tags { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; }
+  .mobile-slot-tag {
+    font-size: 6px; font-weight: 800; text-transform: uppercase;
+    padding: 1px 4px; border-radius: 3px; line-height: 1.4;
+  }
+  .mobile-slot-tag.tag-canceled { background: rgba(224,92,92,0.15); color: var(--cancel); border: 1px solid rgba(224,92,92,0.3); }
+  .mobile-slot-tag.tag-nature   { background: rgba(79,142,247,0.12); color: var(--accent); border: 1px solid rgba(79,142,247,0.25); }
+  .mobile-slot-tag.tag-type     { background: rgba(129,140,248,0.12); color: var(--type-hora); border: 1px solid rgba(129,140,248,0.3); }
+
+  .mobile-slot.slot-active   { background: rgba(62,207,142,0.05); }
+  .mobile-slot.slot-canceled { background: rgba(224,92,92,0.05); }
+  .mobile-slot.slot-feriado  { background: rgba(217,119,6,0.06); }
+  .mobile-slot.slot-empty    { background: transparent; }
+  .mobile-slot.slot-empty .mobile-slot-name { color: var(--t3); font-size: 11px; font-weight: 500; font-style: italic; }
+
+  .mobile-slot-obs { position: absolute; top: 5px; right: 6px; font-size: 11px; }
+
+  /* Dia sem salas */
+  .mobile-empty-day {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 60px 24px; gap: 10px; color: var(--t3); text-align: center;
+  }
+  .mobile-empty-day .empty-icon { font-size: 36px; }
+  .mobile-empty-day .empty-text { font-size: 12px; font-weight: 600; }
+
+  /* ══════════════════════════════════════════════════════════
+     VISÃO MENSAL (lista)
+  ══════════════════════════════════════════════════════════ */
+  .mobile-month-view { padding: 10px; display: flex; flex-direction: column; gap: 5px; }
+
+  .mobile-month-day-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    background: var(--s2); border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.1s;
+  }
+  .mobile-month-day-row:active { background: var(--s3); }
+  .mobile-month-day-row.today-row { border-color: var(--accent); }
+
+  .mobile-month-day-date { flex-shrink: 0; width: 40px; text-align: center; }
+  .mobile-month-day-date .dow { font-size: 7px; font-weight: 900; text-transform: uppercase; color: var(--t3); letter-spacing: 0.5px; }
+  .mobile-month-day-date .num { font-size: 20px; font-weight: 700; color: var(--t2); font-family: 'Fraunces', serif; line-height: 1.1; }
+  .mobile-month-day-row.today-row .num { color: var(--accent); }
+
+  .mobile-month-day-slots { flex: 1; display: flex; flex-wrap: wrap; gap: 3px; overflow: hidden; }
+
+  .mobile-month-slot-chip {
+    font-size: 9px; font-weight: 700; color: var(--text);
+    background: rgba(62,207,142,0.1); border: 1px solid rgba(62,207,142,0.2);
+    border-radius: 4px; padding: 2px 6px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 110px;
+  }
+  .mobile-month-slot-chip.chip-manha::before { content: '☀ '; font-size: 8px; }
+  .mobile-month-slot-chip.chip-tarde::before { content: '🌙 '; font-size: 8px; }
+  .mobile-month-slot-chip.chip-canceled { background: rgba(224,92,92,0.1); border-color: rgba(224,92,92,0.2); color: var(--cancel); }
+  .mobile-month-slot-chip.chip-feriado  { background: rgba(217,119,6,0.1); border-color: rgba(217,119,6,0.2); color: var(--feriado); }
+
+  .mobile-month-more { font-size: 9px; color: var(--t3); font-style: italic; align-self: center; }
+  .mobile-month-day-arrow { flex-shrink: 0; color: var(--t3); font-size: 13px; }
+
+  /* ══════════════════════════════════════════════════════════
+     MODAL: bottom sheet no mobile
+  ══════════════════════════════════════════════════════════ */
+  .modal-overlay.open { align-items: flex-end; }
+  .modal-card {
+    border-radius: 20px 20px 0 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 90vh;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Config drawer: tela cheia */
+  .cfg-panel { width: 100% !important; max-width: 100vw !important; }
+
+  /* Toast: base */
+  .toast { right: 12px; left: 12px; bottom: 72px; text-align: center; }
+}
+
+/* ── Tema claro ajustes mobile ── */
+@media (max-width: 768px) {
+  body.light-theme .mobile-slot-name { color: #162033; font-weight: 800; }
+  body.light-theme .mobile-slot.slot-active { background: rgba(15,159,110,0.07); }
+}
