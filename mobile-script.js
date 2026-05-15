@@ -532,7 +532,7 @@ function showMobileSlotDetail(key) {
                     const pc = e.priceCartao     ? fmtPrice(e.priceCartao)     : null;
                     if (!pp && !pc) return '';
                     return `<div style="background:var(--s3);border-radius:8px;padding:12px;">
-                      ${e.label ? `<div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">${e.label}</div>` : ''}
+                      ${(e.serviceLabel || e.label) ? `<div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">${e.serviceLabel || e.label}</div>` : ''}
                       <div style="display:flex;gap:12px;">
                         ${pp ? `<div style="flex:1;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Particular</div><div style="font-size:15px;font-weight:800;color:var(--active);">${pp}</div></div>` : ''}
                         ${pc ? `<div style="flex:1;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Cartão Fisio</div><div style="font-size:15px;font-weight:800;color:var(--active);">${pc}</div></div>` : ''}

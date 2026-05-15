@@ -792,7 +792,7 @@ function slotHTML(slot, key, isMonthView) {
       _peEntries.forEach(e => {
           const pp = e.priceParticular ? fmtPrice(e.priceParticular) : null;
           const pc = e.priceCartao     ? fmtPrice(e.priceCartao)     : null;
-          const lbl = e.label ? `${e.label}: ` : '';
+          const lbl = (e.serviceLabel || e.label) ? `${e.serviceLabel || e.label}: ` : '';
           if (pp) tooltip += `\n${lbl}Particular: ${pp}`;
           if (pc) tooltip += `\n${lbl}Cartão Fisiocenter: ${pc}`;
       });
