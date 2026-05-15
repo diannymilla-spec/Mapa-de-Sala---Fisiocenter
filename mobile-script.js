@@ -294,11 +294,6 @@ function buildBottomNav(isEdit) {
         <span class="nav-icon">⭐</span>
         <span class="nav-label">Hoje</span>
       </button>
-      <button class="mobile-nav-btn"
-              onclick="${isEdit ? 'openConfig()' : 'openLock()'}">
-        <span class="nav-icon">${isEdit ? '⚙️' : '🔒'}</span>
-        <span class="nav-label">${isEdit ? 'Config' : 'Acesso'}</span>
-      </button>
     </nav>`;
 }
 
