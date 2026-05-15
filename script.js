@@ -1474,12 +1474,25 @@ function renderCfgBody(tab) {
                     <label class="form-label">Natureza Padrão <span style="color:var(--t3);font-weight:400;text-transform:none;">(opcional — sobrepõe a agenda)</span></label>
                     <div id="tglDefaultNature" style="display:flex;flex-direction:column;gap:6px;">
                         <div style="display:flex;gap:6px;">
-                            <button class="tgl-btn active" style="flex:1" onclick="setTgl('tglDefaultNature',this,'')">Nenhuma</button>
-                            <button class="tgl-btn" style="flex:1" onclick="setTgl('tglDefaultNature',this,'Consulta')">Consulta</button>
+                            <button class="tgl-btn active" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'','newDocPrices')">Nenhuma</button>
+                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta','newDocPrices')">Consulta</button>
                         </div>
                         <div style="display:flex;gap:6px;">
-                            <button class="tgl-btn" style="flex:1" onclick="setTgl('tglDefaultNature',this,'Consulta/Sessão')">Consulta/Sessão</button>
-                            <button class="tgl-btn" style="flex:1" onclick="setTgl('tglDefaultNature',this,'Procedimento')">Procedimento</button>
+                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta/Sessão','newDocPrices')">Consulta/Sessão</button>
+                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Procedimento','newDocPrices')">Procedimento</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="newDocPrices" style="display:none; background:var(--s1); border:1px solid var(--border); border-radius:4px; padding:10px; margin-top:4px; margin-bottom:8px;">
+                    <label class="form-label" style="margin-bottom:8px;">Valores de Consulta</label>
+                    <div style="display:flex; gap:8px;">
+                        <div style="flex:1;">
+                            <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">PARTICULAR (R$)</label>
+                            <input type="text" class="inp" id="newDocPriceParticular" placeholder="0,00" style="padding:6px 8px;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">CARTÃO FISIOCENTER (R$)</label>
+                            <input type="text" class="inp" id="newDocPriceCartao" placeholder="0,00" style="padding:6px 8px;">
                         </div>
                     </div>
                 </div>
