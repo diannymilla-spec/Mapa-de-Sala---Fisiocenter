@@ -1640,7 +1640,7 @@ function initDocEntries(doctorId) {
 }
 
 function renderDocEntriesList() {
-    const el = document.getElementById('docEntriesList');
+    const el = document.getElementById('docEntriesList') || document.querySelector('[id^="docEntriesList-"]');
     if (!el) return;
     if (_pendingDocEntries.length === 0) {
         el.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade. Clique em + Adicionar.</div>';
@@ -1664,8 +1664,9 @@ function removeDocEntry(idx) {
     renderDocEntriesList();
 }
 
-function showAddDocEntryForm() {
-    const af = document.getElementById('docEntriesAddForm');
+function showAddDocEntryForm(suffix) {
+    const afId = suffix ? 'docEntriesAddForm-' + suffix : 'docEntriesAddForm';
+    const af = document.getElementById(afId);
     if (!af) return;
     af.innerHTML = `
         <div style="background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px;margin-top:4px;">
@@ -1681,7 +1682,7 @@ function showAddDocEntryForm() {
                 <div style="flex:1;"><label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:3px;">CARTÃO FISIOCENTER (R$)</label><input type="text" class="inp" id="nde-pc" placeholder="0,00" style="padding:6px 8px;"></div>
             </div>
             <div style="display:flex;gap:6px;">
-                <button class="btn btn-ghost" style="flex:1;padding:6px;" onclick="document.getElementById('docEntriesAddForm').innerHTML=''">✕ Cancelar</button>
+                <button class="btn btn-ghost" style="flex:1;padding:6px;" onclick="document.getElementById('${suffix ? 'docEntriesAddForm-'+suffix : 'docEntriesAddForm'}').innerHTML=''">✕ Cancelar</button>
                 <button class="btn btn-primary" style="flex:1;padding:6px;" onclick="confirmAddDocEntry()">✓ Adicionar</button>
             </div>
         </div>`;
@@ -1775,9 +1776,9 @@ function editDoctor(id) {
                 </div>
             </div>
             <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-top:4px;display:block;">Especialidades e Valores</label>
-            <div id="docEntriesList" style="margin-top:4px;"></div>
-            <div id="docEntriesAddForm"></div>
-            <button class="btn btn-ghost" style="width:100%;padding:6px;font-size:10px;margin-top:4px;" onclick="showAddDocEntryForm()">+ Adicionar Especialidade</button>
+            <div id="docEntriesList-${id}" style="margin-top:4px;"></div>
+            <div id="docEntriesAddForm-${id}"></div>
+            <button class="btn btn-ghost" style="width:100%;padding:6px;font-size:10px;margin-top:4px;" onclick="showAddDocEntryForm('${id}')">+ Adicionar Especialidade</button>
             ${convHtml}
             ${procHtml}
             <div style="display:flex;gap:8px;margin-top:4px;">
