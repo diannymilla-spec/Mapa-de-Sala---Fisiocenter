@@ -1640,7 +1640,11 @@ function initDocEntries(doctorId) {
 }
 
 function renderDocEntriesList() {
-    const el = document.getElementById('docEntriesList') || document.querySelector('[id^="docEntriesList-"]');
+    let el = document.getElementById('docEntriesList');
+    if (!el) {
+        const all = document.querySelectorAll('[id^="docEntriesList-"]');
+        if (all.length > 0) el = all[all.length - 1];
+    }
     if (!el) return;
     if (_pendingDocEntries.length === 0) {
         el.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade. Clique em + Adicionar.</div>';
@@ -1702,7 +1706,10 @@ function confirmAddDocEntry() {
     const pc = (nature !== 'Procedimento') ? document.getElementById('nde-pc')?.value.trim() : '';
     _pendingDocEntries.push({ id: 'pe_' + Date.now(), label, nature: nature || null, priceParticular: pp || null, priceCartao: pc || null });
     renderDocEntriesList();
-    document.getElementById('docEntriesAddForm').innerHTML = '';
+    const af1 = document.getElementById('docEntriesAddForm');
+    if (af1) af1.innerHTML = '';
+    const af2 = document.querySelector('[id^="docEntriesAddForm-"]');
+    if (af2) af2.innerHTML = '';
 }
 
 function editDoctor(id) {
