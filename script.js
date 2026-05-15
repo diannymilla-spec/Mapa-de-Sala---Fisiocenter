@@ -70,6 +70,8 @@ let curTgl = {
     tglDefaultNature: ''
 };
 
+let _pendingDocEntries = [];
+
 // ── FORÇAR TEXTOS (MAIÚSCULAS/TITLE CASE) ──
 document.addEventListener('input', function(e) {
     if (e.target.tagName === 'INPUT' && e.target.type === 'text') {
@@ -1472,28 +1474,19 @@ function renderCfgBody(tab) {
                     <label class="form-label">Natureza Padrão <span style="color:var(--t3);font-weight:400;text-transform:none;">(opcional — sobrepõe a agenda)</span></label>
                     <div id="tglDefaultNature" style="display:flex;flex-direction:column;gap:6px;">
                         <div style="display:flex;gap:6px;">
-                            <button class="tgl-btn active" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'','newDocPrices')">Nenhuma</button>
-                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta','newDocPrices')">Consulta</button>
+                            <button class="tgl-btn active" style="flex:1" onclick="setTgl('tglDefaultNature',this,'')">Nenhuma</button>
+                            <button class="tgl-btn" style="flex:1" onclick="setTgl('tglDefaultNature',this,'Consulta')">Consulta</button>
                         </div>
                         <div style="display:flex;gap:6px;">
-                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta/Sessão','newDocPrices')">Consulta/Sessão</button>
-                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Procedimento','newDocPrices')">Procedimento</button>
+                            <button class="tgl-btn" style="flex:1" onclick="setTgl('tglDefaultNature',this,'Consulta/Sessão')">Consulta/Sessão</button>
+                            <button class="tgl-btn" style="flex:1" onclick="setTgl('tglDefaultNature',this,'Procedimento')">Procedimento</button>
                         </div>
                     </div>
                 </div>
-                <div id="newDocPrices" style="display:none; background:var(--s1); border:1px solid var(--border); border-radius:4px; padding:10px; margin-top:-8px; margin-bottom:8px;">
-                    <label class="form-label" style="margin-bottom:8px;">Valores de Consulta</label>
-                    <div style="display:flex; gap:8px;">
-                        <div style="flex:1;">
-                            <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">PARTICULAR (R$)</label>
-                            <input type="text" class="inp" id="newDocPriceParticular" placeholder="0,00" style="padding:6px 8px;">
-                        </div>
-                        <div style="flex:1;">
-                            <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">CARTÃO FISIOCENTER (R$)</label>
-                            <input type="text" class="inp" id="newDocPriceCartao" placeholder="0,00" style="padding:6px 8px;">
-                        </div>
-                    </div>
-                </div>
+                <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:4px;">Especialidades e Valores</label>
+                <div id="docEntriesList"></div>
+                <div id="docEntriesAddForm"></div>
+                <button class="btn btn-ghost" style="width:100%;padding:6px;font-size:10px;margin-top:4px;margin-bottom:8px;" onclick="showAddDocEntryForm()">+ Adicionar Especialidade</button>
                 <button class="btn btn-primary" style="width:100%" onclick="addDoctor()">Cadastrar Médico</button>
             </div>
 
@@ -1529,6 +1522,7 @@ function renderCfgBody(tab) {
                 </div>`).join('')}
             </div>` : ''}
         `;
+        setTimeout(() => initDocEntries(null), 30);
     } else {
         const activeRooms   = unit.rooms.filter(r => !r.archived && !r.archivedFrom);
         const archivedRooms = unit.rooms.filter(r => r.archived || r.archivedFrom);
@@ -1614,6 +1608,89 @@ function setEditTglWithPrices(gid, btn, priceGroupId) {
     if (pg) pg.style.display = (val === 'Consulta' || val === 'Consulta/Sessão') ? '' : 'none';
 }
 
+// ── Gestão de entradas de especialidade no formulário de médico ──
+function initDocEntries(doctorId) {
+    if (doctorId) {
+        const d = S.doctors.find(x => x.id === doctorId);
+        const existing = (S.priceEntries || []).filter(e => e.doctorId === doctorId && e.unitId === S.currentUnit);
+        if (existing.length > 0) {
+            _pendingDocEntries = existing.map(e => ({...e}));
+        } else if (d && (d.priceParticular || d.priceCartao)) {
+            _pendingDocEntries = [{ id: 'pe_tmp_' + Date.now(), label: d.spec || (d.defaultNature || 'Consulta'), nature: d.defaultNature || 'Consulta', priceParticular: d.priceParticular || null, priceCartao: d.priceCartao || null }];
+        } else {
+            _pendingDocEntries = [];
+        }
+    } else {
+        _pendingDocEntries = [];
+    }
+    renderDocEntriesList();
+}
+
+function renderDocEntriesList() {
+    const el = document.getElementById('docEntriesList');
+    if (!el) return;
+    if (_pendingDocEntries.length === 0) {
+        el.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade. Clique em + Adicionar.</div>';
+        return;
+    }
+    el.innerHTML = _pendingDocEntries.map((e, i) => {
+        const natureBadge = e.nature ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>` : '';
+        const ppStr = (e.nature !== 'Procedimento' && e.priceParticular) ? `<span style="color:var(--active);font-size:11px;font-weight:700;">R$ ${e.priceParticular}</span>` : '';
+        const pcStr = (e.nature !== 'Procedimento' && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;">Cartão: R$ ${e.priceCartao}</span>` : '';
+        return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s1);border-radius:4px;margin-bottom:4px;">
+            ${natureBadge}
+            <span style="flex:1;font-size:11px;font-weight:600;">${e.label}</span>
+            ${ppStr}${pcStr}
+            <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="removeDocEntry(${i})">✕</button>
+        </div>`;
+    }).join('');
+}
+
+function removeDocEntry(idx) {
+    _pendingDocEntries.splice(idx, 1);
+    renderDocEntriesList();
+}
+
+function showAddDocEntryForm() {
+    const af = document.getElementById('docEntriesAddForm');
+    if (!af) return;
+    af.innerHTML = `
+        <div style="background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+            <input type="text" class="inp" id="nde-label" placeholder="Especialidade (ex: Clínica Geral)" style="padding:6px 8px;">
+            <select id="nde-nature" class="sel" onchange="toggleDocEntryPrices(this.value)" style="padding:6px 8px;font-size:11px;">
+                <option value="">Todos (sem filtro)</option>
+                <option value="Consulta">Consulta</option>
+                <option value="Consulta/Sessão">Consulta/Sessão</option>
+                <option value="Procedimento">Procedimento</option>
+            </select>
+            <div id="nde-prices" style="display:flex;gap:8px;">
+                <div style="flex:1;"><label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:3px;">PARTICULAR (R$)</label><input type="text" class="inp" id="nde-pp" placeholder="0,00" style="padding:6px 8px;"></div>
+                <div style="flex:1;"><label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:3px;">CARTÃO FISIOCENTER (R$)</label><input type="text" class="inp" id="nde-pc" placeholder="0,00" style="padding:6px 8px;"></div>
+            </div>
+            <div style="display:flex;gap:6px;">
+                <button class="btn btn-ghost" style="flex:1;padding:6px;" onclick="document.getElementById('docEntriesAddForm').innerHTML=''">✕ Cancelar</button>
+                <button class="btn btn-primary" style="flex:1;padding:6px;" onclick="confirmAddDocEntry()">✓ Adicionar</button>
+            </div>
+        </div>`;
+    setTimeout(() => { const inp = document.getElementById('nde-label'); if(inp) inp.focus(); }, 30);
+}
+
+function toggleDocEntryPrices(val) {
+    const el = document.getElementById('nde-prices');
+    if (el) el.style.display = val === 'Procedimento' ? 'none' : 'flex';
+}
+
+function confirmAddDocEntry() {
+    const label = document.getElementById('nde-label')?.value.trim();
+    if (!label) { showToast('INFORME A ESPECIALIDADE'); return; }
+    const nature = document.getElementById('nde-nature')?.value || null;
+    const pp = (nature !== 'Procedimento') ? document.getElementById('nde-pp')?.value.trim() : '';
+    const pc = (nature !== 'Procedimento') ? document.getElementById('nde-pc')?.value.trim() : '';
+    _pendingDocEntries.push({ id: 'pe_' + Date.now(), label, nature: nature || null, priceParticular: pp || null, priceCartao: pc || null });
+    renderDocEntriesList();
+    document.getElementById('docEntriesAddForm').innerHTML = '';
+}
+
 function editDoctor(id) {
     const d = S.doctors.find(x => x.id === id);
     const row = document.getElementById(`row-d-${id}`);
@@ -1663,27 +1740,18 @@ function editDoctor(id) {
             <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;">Natureza Padrão <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
             <div id="edit-tglDefNature-${id}" style="display:flex;flex-direction:column;gap:6px;">
                 <div style="display:flex;gap:6px;">
-                    <button class="tgl-btn ${defNature === '' ? 'active' : ''}" style="flex:1" data-val="" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Nenhuma</button>
-                    <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" style="flex:1" data-val="Consulta" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta</button>
+                    <button class="tgl-btn ${defNature === '' ? 'active' : ''}" style="flex:1" data-val="" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Nenhuma</button>
+                    <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" style="flex:1" data-val="Consulta" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Consulta</button>
                 </div>
                 <div style="display:flex;gap:6px;">
-                    <button class="tgl-btn ${defNature === 'Consulta/Sessão' ? 'active' : ''}" style="flex:1" data-val="Consulta/Sessão" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta/Sessão</button>
-                    <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" style="flex:1" data-val="Procedimento" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Procedimento</button>
+                    <button class="tgl-btn ${defNature === 'Consulta/Sessão' ? 'active' : ''}" style="flex:1" data-val="Consulta/Sessão" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Consulta/Sessão</button>
+                    <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" style="flex:1" data-val="Procedimento" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Procedimento</button>
                 </div>
             </div>
-            <div id="edit-prices-${id}" style="display:${(defNature === 'Consulta' || defNature === 'Consulta/Sessão') ? '' : 'none'}; background:var(--s1); border:1px solid var(--border); border-radius:4px; padding:10px; margin-top:4px;">
-                <label class="form-label" style="margin-bottom:8px; font-size:9px;">VALORES DE CONSULTA</label>
-                <div style="display:flex; gap:8px;">
-                    <div style="flex:1;">
-                        <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">PARTICULAR (R$)</label>
-                        <input type="text" class="inp" id="edit-price-particular-${id}" value="${d.priceParticular || ''}" placeholder="0,00" style="padding:6px 8px;">
-                    </div>
-                    <div style="flex:1;">
-                        <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">CARTÃO FISIOCENTER (R$)</label>
-                        <input type="text" class="inp" id="edit-price-cartao-${id}" value="${d.priceCartao || ''}" placeholder="0,00" style="padding:6px 8px;">
-                    </div>
-                </div>
-            </div>
+            <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-top:4px;display:block;">Especialidades e Valores</label>
+            <div id="docEntriesList" style="margin-top:4px;"></div>
+            <div id="docEntriesAddForm"></div>
+            <button class="btn btn-ghost" style="width:100%;padding:6px;font-size:10px;margin-top:4px;" onclick="showAddDocEntryForm()">+ Adicionar Especialidade</button>
             ${convHtml}
             ${procHtml}
             <div style="display:flex;gap:8px;margin-top:4px;">
@@ -1692,6 +1760,7 @@ function editDoctor(id) {
             </div>
         </div>
     `;
+    setTimeout(() => initDocEntries(id), 30);
 }
 
 function saveDoctorEdit(id) {
@@ -1719,25 +1788,16 @@ function saveDoctorEdit(id) {
         d.defaultNature = defaultNature || null;
         d.convenios = checkedConvenios;
         d.procedimentos = checkedProcs;
-        if (defaultNature === 'Consulta' || defaultNature === 'Consulta/Sessão') {
-            const pp = document.getElementById(`edit-price-particular-${id}`)?.value.trim();
-            const pc = document.getElementById(`edit-price-cartao-${id}`)?.value.trim();
-            d.priceParticular = pp || null;
-            d.priceCartao = pc || null;
-            // Auto-sync: create or update priceEntry matching this nature
-            if (!S.priceEntries) S.priceEntries = [];
-            const existing = S.priceEntries.find(e => e.doctorId === id && e.unitId === S.currentUnit && e.nature === defaultNature);
-            if (existing) {
-                existing.label = d.spec || defaultNature;
-                existing.priceParticular = d.priceParticular;
-                existing.priceCartao = d.priceCartao;
-            } else if (d.priceParticular || d.priceCartao) {
-                S.priceEntries.push({ id: 'pe_' + Date.now(), doctorId: id, unitId: S.currentUnit, label: d.spec || defaultNature, nature: defaultNature, priceParticular: d.priceParticular, priceCartao: d.priceCartao });
-            }
-        } else {
-            d.priceParticular = null;
-            d.priceCartao = null;
-        }
+        // Replace all priceEntries for this doc+unit with the edited list
+        if (!S.priceEntries) S.priceEntries = [];
+        S.priceEntries = S.priceEntries.filter(e => !(e.doctorId === id && e.unitId === S.currentUnit));
+        _pendingDocEntries.forEach(e => {
+            S.priceEntries.push({...e, doctorId: id, unitId: S.currentUnit});
+        });
+        // Backward compat: update profile prices from first consultation entry
+        const _firstConsulta = _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
+        d.priceParticular = _firstConsulta?.priceParticular || null;
+        d.priceCartao = _firstConsulta?.priceCartao || null;
         saveConfig();
         renderCfgBody('medicos');
         showToast('MÉDICO ATUALIZADO COM SUCESSO!');
@@ -1791,13 +1851,17 @@ function addDoctor(){
     const spec=document.getElementById('newDocSpec').value || 'Geral';
     const doc = {id:'d'+Date.now(), name: curTgl.tglPrefix+' '+name, spec, type: curTgl.tglType, unitId: S.currentUnit};
     if (curTgl.tglDefaultNature) doc.defaultNature = curTgl.tglDefaultNature;
-    if (curTgl.tglDefaultNature === 'Consulta' || curTgl.tglDefaultNature === 'Consulta/Sessão') {
-        const pp = document.getElementById('newDocPriceParticular')?.value.trim();
-        const pc = document.getElementById('newDocPriceCartao')?.value.trim();
-        if (pp) doc.priceParticular = pp;
-        if (pc) doc.priceCartao = pc;
-    }
+    // Sync specialty entries to priceEntries
+    if (!S.priceEntries) S.priceEntries = [];
+    _pendingDocEntries.forEach(e => {
+        S.priceEntries.push({...e, doctorId: doc.id, unitId: S.currentUnit});
+    });
+    // Backward compat: also set profile prices from first consultation entry
+    const firstConsulta = _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
+    if (firstConsulta?.priceParticular) doc.priceParticular = firstConsulta.priceParticular;
+    if (firstConsulta?.priceCartao) doc.priceCartao = firstConsulta.priceCartao;
     S.doctors.push(doc);
+    _pendingDocEntries = [];
     curTgl.tglDefaultNature = '';
     saveConfig(); renderCfgBody('medicos'); showToast("MÉDICO CADASTRADO NA UNIDADE ATUAL.");
 }
