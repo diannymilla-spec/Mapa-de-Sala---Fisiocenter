@@ -1684,7 +1684,27 @@ function renderDocEntriesList() {
 
 function removeDocEntry(idx) {
     _pendingDocEntries.splice(idx, 1);
-    renderDocEntriesList();
+    // Try edit-context list first, then add-form list
+    const editEl = document.querySelector('[id^="docEntriesList-"]');
+    if (editEl) {
+        if (_pendingDocEntries.length === 0) {
+            editEl.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade. Clique em + Adicionar.</div>';
+        } else {
+            editEl.innerHTML = _pendingDocEntries.map((e, i) => {
+                const natureBadge = e.nature ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>` : '';
+                const ppStr = (e.nature !== 'Procedimento' && e.priceParticular) ? `<span style="color:var(--active);font-size:11px;font-weight:700;">R$ ${e.priceParticular}</span>` : '';
+                const pcStr = (e.nature !== 'Procedimento' && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;">Cartão: R$ ${e.priceCartao}</span>` : '';
+                return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s1);border-radius:4px;margin-bottom:4px;">
+                    ${natureBadge}
+                    <span style="flex:1;font-size:11px;font-weight:600;">${e.label}</span>
+                    ${ppStr}${pcStr}
+                    <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="removeDocEntry(${i})">✕</button>
+                </div>`;
+            }).join('');
+        }
+    } else {
+        renderDocEntriesList();
+    }
 }
 
 function showAddDocEntryForm(suffix) {
@@ -1863,11 +1883,23 @@ function saveDoctorEdit(id) {
         // Replace all priceEntries for this doc+unit with the edited list
         if (!S.priceEntries) S.priceEntries = [];
         S.priceEntries = S.priceEntries.filter(e => !(e.doctorId === id && e.unitId === S.currentUnit));
+        // Add main entry from profile price fields if not already covered by pending entries
+        const mainPP = document.getElementById('edit-price-particular-' + id)?.value.trim();
+        const mainPC = document.getElementById('edit-price-cartao-' + id)?.value.trim();
+        if (defaultNature && defaultNature !== 'Procedimento' && (mainPP || mainPC)) {
+            const mainLabel = spec || d.spec || 'Consulta';
+            const alreadyInPending = _pendingDocEntries.some(e => e.label === mainLabel && e.nature === defaultNature);
+            if (!alreadyInPending) {
+                S.priceEntries.push({ id: 'pe_main_' + id, doctorId: id, unitId: S.currentUnit, label: mainLabel, nature: defaultNature, priceParticular: mainPP || null, priceCartao: mainPC || null });
+            }
+        }
         _pendingDocEntries.forEach(e => {
             S.priceEntries.push({...e, doctorId: id, unitId: S.currentUnit});
         });
         // Backward compat: update profile prices from first consultation entry
-        const _firstConsulta = _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
+        const _firstConsulta = (mainPP || mainPC)
+            ? { priceParticular: mainPP, priceCartao: mainPC }
+            : _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
         d.priceParticular = _firstConsulta?.priceParticular || null;
         d.priceCartao = _firstConsulta?.priceCartao || null;
         saveConfig();
@@ -1925,11 +1957,23 @@ function addDoctor(){
     if (curTgl.tglDefaultNature) doc.defaultNature = curTgl.tglDefaultNature;
     // Sync specialty entries to priceEntries
     if (!S.priceEntries) S.priceEntries = [];
+    // Add main entry from profile price fields if not already covered by pending entries
+    const _mainPP = document.getElementById('newDocPriceParticular')?.value.trim();
+    const _mainPC = document.getElementById('newDocPriceCartao')?.value.trim();
+    if (curTgl.tglDefaultNature && curTgl.tglDefaultNature !== 'Procedimento' && (_mainPP || _mainPC)) {
+        const _mainLabel = spec || 'Consulta';
+        const _alreadyInPending = _pendingDocEntries.some(e => e.label === _mainLabel && e.nature === curTgl.tglDefaultNature);
+        if (!_alreadyInPending) {
+            S.priceEntries.push({ id: 'pe_main_' + doc.id, doctorId: doc.id, unitId: S.currentUnit, label: _mainLabel, nature: curTgl.tglDefaultNature, priceParticular: _mainPP || null, priceCartao: _mainPC || null });
+        }
+    }
     _pendingDocEntries.forEach(e => {
         S.priceEntries.push({...e, doctorId: doc.id, unitId: S.currentUnit});
     });
     // Backward compat: also set profile prices from first consultation entry
-    const firstConsulta = _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
+    const firstConsulta = (_mainPP || _mainPC)
+        ? { priceParticular: _mainPP, priceCartao: _mainPC }
+        : _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
     if (firstConsulta?.priceParticular) doc.priceParticular = firstConsulta.priceParticular;
     if (firstConsulta?.priceCartao) doc.priceCartao = firstConsulta.priceCartao;
     S.doctors.push(doc);
