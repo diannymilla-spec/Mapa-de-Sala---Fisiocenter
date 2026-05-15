@@ -69,6 +69,7 @@ function renderMobileShell() {
     // ── Modo Tabela de Preços: usa o mainContent desktop ──────
     if (mobileView === 'priceTable') {
         document.body.classList.add('mobile-price-table');
+        document.body.classList.remove('mobile-dashboard');
         if (mc) mc.style.setProperty('display', 'block', 'important');
         wrapper.style.display = '';
         wrapper.innerHTML = buildMobileTopbar(unit, isEdit) + buildBottomNav(isEdit);
@@ -77,8 +78,21 @@ function renderMobileShell() {
         return;
     }
 
+    // ── Modo Dashboard: usa o mainContent desktop ──────────────
+    if (mobileView === 'dashboard') {
+        document.body.classList.add('mobile-dashboard');
+        document.body.classList.remove('mobile-price-table');
+        if (mc) mc.style.setProperty('display', 'block', 'important');
+        wrapper.style.display = '';
+        wrapper.innerHTML = buildMobileTopbar(unit, isEdit) + buildBottomNav(isEdit);
+        S.view = 'dashboard';
+        _originalRenderMain();
+        return;
+    }
+
     // ── Modos normais ──────────────────────────────────────────
     document.body.classList.remove('mobile-price-table');
+    document.body.classList.remove('mobile-dashboard');
     if (mc) mc.style.display = 'none';
     wrapper.style.display = '';
 
@@ -107,11 +121,9 @@ function buildMobileTopbar(unit, isEdit) {
               title="Tabela de Preços">💰</button>
       <button class="mobile-topbar-btn" onclick="mobileMoreOpen=false; openSearch();" title="Buscar">🔍</button>
       <button class="mobile-topbar-btn" onclick="toggleTheme()" title="Tema">🌓</button>
-      <button class="mobile-topbar-btn ${isEdit ? 'edit-active' : ''}"
-              onclick="${isEdit ? 'exitConfigMode()' : 'openLock()'}"
-              title="${isEdit ? 'Modo edição ativo' : 'Entrar na edição'}">
-        ${isEdit ? '🔓' : '🔒'}
-      </button>
+      <button class="mobile-topbar-btn ${mobileView==='dashboard' ? 'edit-active' : ''}"
+              onclick="mobileMoreOpen=false; mobileView=(mobileView==='dashboard'?'day':'dashboard'); renderMain();"
+              title="Dashboard">📊</button>
     </div>`;
 }
 
@@ -389,9 +401,18 @@ function buildBottomNav(isEdit) {
       z-index:101; overflow:hidden;">
       <div style="padding:8px 16px 6px;font-size:8px;font-weight:900;color:var(--t3);
                   letter-spacing:1px;border-bottom:1px solid var(--border);">ATALHOS</div>
+      <button onclick="mobileMoreOpen=false; mobileView='dashboard'; renderMain();" style="${btnStyle}">
+        <span style="${iconStyle}">📊</span>
+        <div><div style="${labelStyle}">Dashboard</div><div style="${descStyle}">Estatísticas e indicadores</div></div>
+      </button>
       <button onclick="mobileMoreOpen=false; mobileView='priceTable'; renderMain();" style="${btnStyle}">
         <span style="${iconStyle}">💰</span>
         <div><div style="${labelStyle}">Tabela de Preços</div><div style="${descStyle}">Consultar e editar valores</div></div>
+      </button>
+      <button onclick="${isEdit ? 'openConfig()' : 'openLock()'}; mobileMoreOpen=false; renderMain();" style="${btnStyle}">
+        <span style="${iconStyle}">${isEdit ? '⚙️' : '🔒'}</span>
+        <div><div style="${labelStyle}">${isEdit ? 'Configurações' : 'Acesso'}</div>
+             <div style="${descStyle}">${isEdit ? 'Modo edição ativo' : 'Entrar para editar'}</div></div>
       </button>
       <button onclick="toggleTheme(); mobileMoreOpen=false; renderMain();" style="${btnStyle}">
         <span style="${iconStyle}">🌓</span>
@@ -404,11 +425,6 @@ function buildBottomNav(isEdit) {
       <button onclick="goToMobileToday(); mobileMoreOpen=false; renderMain();" style="${btnStyle}">
         <span style="${iconStyle}">⭐</span>
         <div><div style="${labelStyle}">Ir para Hoje</div><div style="${descStyle}">Voltar ao dia atual</div></div>
-      </button>
-      <button onclick="${isEdit ? 'openConfig()' : 'openLock()'}; mobileMoreOpen=false; renderMain();" style="${btnStyle}">
-        <span style="${iconStyle}">${isEdit ? '⚙️' : '🔒'}</span>
-        <div><div style="${labelStyle}">${isEdit ? 'Configurações' : 'Acesso'}</div>
-             <div style="${descStyle}">${isEdit ? 'Modo edição ativo' : 'Entrar para editar'}</div></div>
       </button>
       ${canInstall ? `
       <button onclick="triggerPwaInstall(); mobileMoreOpen=false;" style="${btnStyle}color:var(--accent);">
@@ -437,7 +453,7 @@ function buildBottomNav(isEdit) {
       <button class="mobile-nav-btn ${mobileMoreOpen ? 'active' : ''}"
               onclick="mobileMoreOpen=!mobileMoreOpen; renderMain();">
         <span class="nav-icon" style="font-size:18px;line-height:1.2;">≡</span>
-        <span class="nav-label">Mais</span>
+        <span class="nav-label">Menu</span>
       </button>
     </nav>`;
 }
