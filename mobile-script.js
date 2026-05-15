@@ -484,8 +484,33 @@ function showMobileSlotDetail(key) {
         if (doc) {
             const nature  = slot.nature || doc.defNature || 'Consulta';
             const typeTxt = doc.type === 'hora' ? 'Hora Marcada' : 'Ordem de Chegada';
-            const pp = doc.priceParticular ? fmtPrice(doc.priceParticular) : null;
-            const pc = doc.priceCartao     ? fmtPrice(doc.priceCartao)     : null;
+
+            // Preços: Tabela de Preços tem prioridade; fallback no perfil do médico
+            const _peList = (S.priceEntries || []).filter(e => e.doctorId === doc.id && e.unitId === S.currentUnit);
+            let pricesHTML = '';
+            if (_peList.length > 0) {
+                pricesHTML = _peList.map(e => {
+                    const pp = e.priceParticular ? fmtPrice(e.priceParticular) : null;
+                    const pc = e.priceCartao     ? fmtPrice(e.priceCartao)     : null;
+                    if (!pp && !pc) return '';
+                    return `<div style="background:var(--s3);border-radius:8px;padding:12px;">
+                      ${e.label ? `<div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">${e.label}</div>` : ''}
+                      <div style="display:flex;gap:12px;">
+                        ${pp ? `<div style="flex:1;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Particular</div><div style="font-size:15px;font-weight:800;color:var(--active);">${pp}</div></div>` : ''}
+                        ${pc ? `<div style="flex:1;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:2px;">Cartão Fisio</div><div style="font-size:15px;font-weight:800;color:var(--active);">${pc}</div></div>` : ''}
+                      </div>
+                    </div>`;
+                }).join('');
+            } else {
+                const pp = doc.priceParticular ? fmtPrice(doc.priceParticular) : null;
+                const pc = doc.priceCartao     ? fmtPrice(doc.priceCartao)     : null;
+                if (pp || pc) {
+                    pricesHTML = `<div style="background:var(--s3);border-radius:8px;padding:12px;display:flex;gap:12px;">
+                      ${pp ? `<div style="flex:1;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Particular</div><div style="font-size:16px;font-weight:800;color:var(--active);">${pp}</div></div>` : ''}
+                      ${pc ? `<div style="flex:1;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Cartão Fisiocenter</div><div style="font-size:16px;font-weight:800;color:var(--active);">${pc}</div></div>` : ''}
+                    </div>`;
+                }
+            }
 
             content = `
             <div style="display:flex;flex-direction:column;gap:12px;">
@@ -515,11 +540,7 @@ function showMobileSlotDetail(key) {
                   <div style="font-size:10px;font-weight:800;color:var(--cancel);">⛔ CANCELADO</div>
                 </div>` : ''}
               </div>
-              ${(pp || pc) ? `
-              <div style="background:var(--s3);border-radius:8px;padding:12px;display:flex;gap:12px;">
-                ${pp ? `<div style="flex:1;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Particular</div><div style="font-size:16px;font-weight:800;color:var(--active);">${pp}</div></div>` : ''}
-                ${pc ? `<div style="flex:1;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Cartão Fisiocenter</div><div style="font-size:16px;font-weight:800;color:var(--active);">${pc}</div></div>` : ''}
-              </div>` : ''}
+              ${pricesHTML}
               ${slot.obs ? `
               <div style="background:rgba(217,119,6,0.1);border:1px solid rgba(217,119,6,0.3);border-radius:8px;padding:10px;">
                 <div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--feriado);margin-bottom:4px;">⚠️ Observação</div>

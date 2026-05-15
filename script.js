@@ -729,7 +729,17 @@ function slotHTML(slot, key, isMonthView) {
   const typeDisplay = typeTxt === 'hora' ? 'Hora Marcada' : 'Ordem de Chegada';
   let tooltip = `${doc.name}\nEspecialidade: ${doc.spec}\nNatureza: ${natureTxt}\nAtendimento: ${typeDisplay}`;
 
-  if ((natureTxt === 'Consulta' || natureTxt === 'Consulta/Sessão') && (doc.priceParticular || doc.priceCartao)) {
+  // Preços: prioriza entradas da Tabela de Preços, cai no perfil do médico como fallback
+  const _peEntries = (S.priceEntries || []).filter(e => e.doctorId === doc.id && e.unitId === S.currentUnit);
+  if (_peEntries.length > 0) {
+      _peEntries.forEach(e => {
+          const pp = e.priceParticular ? fmtPrice(e.priceParticular) : null;
+          const pc = e.priceCartao     ? fmtPrice(e.priceCartao)     : null;
+          const lbl = e.label ? `${e.label}: ` : '';
+          if (pp) tooltip += `\n${lbl}Particular: ${pp}`;
+          if (pc) tooltip += `\n${lbl}Cartão Fisiocenter: ${pc}`;
+      });
+  } else if (doc.priceParticular || doc.priceCartao) {
       if (doc.priceParticular) tooltip += `\nParticular: ${fmtPrice(doc.priceParticular)}`;
       if (doc.priceCartao) tooltip += `\nCartão Fisiocenter: ${fmtPrice(doc.priceCartao)}`;
   }
