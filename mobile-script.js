@@ -10,6 +10,7 @@ const IS_MOBILE = () => window.innerWidth <= 768;
 // ── Estado mobile ──────────────────────────────────────────────
 let mobileSelectedDate = fmt(new Date());
 let mobileView = 'day';
+let mobileMoreOpen = false;
 
 // ── Override renderMain usando assignment (evita bug de hoisting) ──
 const _originalRenderMain = renderMain;
@@ -274,25 +275,52 @@ function buildMonthDayChips(daySlots) {
 
 // ── Bottom Nav ─────────────────────────────────────────────────
 function buildBottomNav(isEdit) {
+    const moreMenu = mobileMoreOpen ? `
+    <div id="mobileMoreMenu" style="
+      position:fixed; bottom:60px; right:0;
+      background:var(--s2); border:1px solid var(--border);
+      border-radius:12px 12px 0 0; min-width:180px;
+      box-shadow:0 -4px 24px rgba(0,0,0,0.4);
+      z-index:101; overflow:hidden;">
+      <button onclick="goToMobileToday(); mobileMoreOpen=false; renderMain();"
+              style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
+                     background:transparent;border:none;color:var(--text);font-size:13px;
+                     font-weight:700;cursor:pointer;border-bottom:1px solid var(--border);
+                     -webkit-tap-highlight-color:transparent;">
+        <span style="font-size:20px;">⭐</span> Ir para Hoje
+      </button>
+      <button onclick="${isEdit ? 'openConfig()' : 'openLock()'}; mobileMoreOpen=false; renderMain();"
+              style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
+                     background:transparent;border:none;color:var(--text);font-size:13px;
+                     font-weight:700;cursor:pointer;
+                     -webkit-tap-highlight-color:transparent;">
+        <span style="font-size:20px;">${isEdit ? '⚙️' : '🔒'}</span> ${isEdit ? 'Configurações' : 'Acesso'}
+      </button>
+    </div>
+    <div onclick="mobileMoreOpen=false; renderMain();"
+         style="position:fixed;inset:0;bottom:60px;z-index:100;"></div>` : '';
+
     return `
+    ${moreMenu}
     <nav class="mobile-bottom-nav">
       <button class="mobile-nav-btn ${mobileView==='day' ? 'active' : ''}"
-              onclick="mobileView='day'; renderMain();">
+              onclick="mobileMoreOpen=false; mobileView='day'; renderMain();">
         <span class="nav-icon">📅</span>
         <span class="nav-label">Dia</span>
       </button>
       <button class="mobile-nav-btn ${mobileView==='month' ? 'active' : ''}"
-              onclick="mobileView='month'; renderMain();">
+              onclick="mobileMoreOpen=false; mobileView='month'; renderMain();">
         <span class="nav-icon">🗓</span>
         <span class="nav-label">Mês</span>
       </button>
-      <button class="mobile-nav-btn" onclick="openSearch()">
+      <button class="mobile-nav-btn" onclick="mobileMoreOpen=false; openSearch();">
         <span class="nav-icon">🔍</span>
         <span class="nav-label">Buscar</span>
       </button>
-      <button class="mobile-nav-btn" onclick="goToMobileToday()">
-        <span class="nav-icon">⭐</span>
-        <span class="nav-label">Hoje</span>
+      <button class="mobile-nav-btn ${mobileMoreOpen ? 'active' : ''}"
+              onclick="mobileMoreOpen=!mobileMoreOpen; renderMain();">
+        <span class="nav-icon" style="font-size:18px;line-height:1.2;">≡</span>
+        <span class="nav-label">Mais</span>
       </button>
     </nav>`;
 }
