@@ -226,6 +226,22 @@ function fmtPrice(val) {
 
 let _priceSearch = '';
 
+function deduplicatePriceEntries() {
+    if (!S.priceEntries || S.priceEntries.length === 0) return;
+    const seen = new Set();
+    const before = S.priceEntries.length;
+    S.priceEntries = S.priceEntries.filter(e => {
+        const key = `${e.doctorId}|${e.unitId}|${e.label}|${e.nature}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+    if (S.priceEntries.length < before) {
+        saveConfig();
+        console.log(`Removidas ${before - S.priceEntries.length} entradas duplicadas.`);
+    }
+}
+
 function renderPriceTable() {
   const el = document.getElementById('mainContent');
   const unit = S.units.find(u => u.id === S.currentUnit);
@@ -289,7 +305,9 @@ function renderPriceTable() {
       const ppColor = e.priceParticular ? 'var(--active)' : 'var(--t3)';
       const pcColor = e.priceCartao     ? 'var(--active)' : 'var(--t3)';
       const isLast = idx === entries.length - 1;
-      const natureBadge = e.nature ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;margin-left:5px;vertical-align:middle;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>` : '';
+      const natureBadge = e.nature
+        ? `<span style="font-size:8px;font-weight:900;text-transform:uppercase;padding:2px 6px;border-radius:3px;margin-left:6px;background:rgba(79,142,247,0.12);color:var(--accent);border:1px solid rgba(79,142,247,0.25);">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>`
+        : '';
       return `<tr id="price-entry-${e.id}" style="border-bottom:${isLast ? '2px solid var(--border)' : '1px solid rgba(255,255,255,0.05)'};">
         <td style="padding:${idx===0?'10px':'6px'} 12px;vertical-align:${idx===0?'top':'middle'};">
           ${idx===0 ? docHeader : '<span style="color:var(--t3);padding-left:6px;">└</span>'}
@@ -520,6 +538,7 @@ async function init() {
             if (unitsRow?.data)        S.units        = unitsRow.data;
             if (doctorsRow?.data)      S.doctors      = doctorsRow.data;
             if (priceEntriesRow?.data) S.priceEntries = priceEntriesRow.data;
+            deduplicatePriceEntries();
         }
 
         // 3. Carregar slots do Supabase
@@ -1794,7 +1813,26 @@ function editDoctor(id) {
             </div>
         </div>
     `;
-    setTimeout(() => initDocEntries(id), 100);
+    setTimeout(() => {
+        _pendingDocEntries = (S.priceEntries || []).filter(e => e.doctorId === id && e.unitId === S.currentUnit).map(e => ({...e}));
+        const el = document.getElementById('docEntriesList-' + id);
+        if (!el) return;
+        if (_pendingDocEntries.length === 0) {
+            el.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade. Clique em + Adicionar.</div>';
+            return;
+        }
+        el.innerHTML = _pendingDocEntries.map((e, i) => {
+            const natureBadge = e.nature ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>` : '';
+            const ppStr = (e.nature !== 'Procedimento' && e.priceParticular) ? `<span style="color:var(--active);font-size:11px;font-weight:700;">R$ ${e.priceParticular}</span>` : '';
+            const pcStr = (e.nature !== 'Procedimento' && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;">Cartão: R$ ${e.priceCartao}</span>` : '';
+            return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s1);border-radius:4px;margin-bottom:4px;">
+                ${natureBadge}
+                <span style="flex:1;font-size:11px;font-weight:600;">${e.label}</span>
+                ${ppStr}${pcStr}
+                <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="removeDocEntry(${i})">✕</button>
+            </div>`;
+        }).join('');
+    }, 100);
 }
 
 function saveDoctorEdit(id) {
