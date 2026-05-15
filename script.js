@@ -1258,7 +1258,7 @@ function saveAllocation() {
   const scope  = curTgl.tglAllocScope;
   const obs    = document.getElementById('allocObs').value.trim();
   const doc    = S.doctors.find(d => d.id === docId);
-  const nature = (doc && doc.defaultNature) ? doc.defaultNature : curTgl.tglAllocNature;
+  const nature = curTgl.tglAllocNature || (doc && doc.defaultNature) || 'Consulta';
 
   const noDocNeeded = status === 'feriado' || status === 'manutencao' || status === 'diasuS';
   if(!docId && !noDocNeeded) { showToast("SELECIONE UM MÉDICO!"); return; }
