@@ -7,10 +7,35 @@
 
 const IS_MOBILE = () => window.innerWidth <= 768;
 
+// ── Versão do app ──────────────────────────────────────────────
+const APP_VERSION = '2.0';
+
 // ── Estado mobile ──────────────────────────────────────────────
 let mobileSelectedDate = fmt(new Date());
 let mobileView = 'day';
 let mobileMoreOpen = false;
+
+// ── PWA: captura prompt de instalação ─────────────────────────
+let _pwaInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    _pwaInstallPrompt = e;
+    if (IS_MOBILE()) renderMain();
+});
+
+function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           navigator.standalone === true;
+}
+
+function triggerPwaInstall() {
+    if (!_pwaInstallPrompt) return;
+    _pwaInstallPrompt.prompt();
+    _pwaInstallPrompt.userChoice.then(() => {
+        _pwaInstallPrompt = null;
+        renderMain();
+    });
+}
 
 // ── Override renderMain usando assignment (evita bug de hoisting) ──
 const _originalRenderMain = renderMain;
@@ -45,9 +70,12 @@ function renderMobileShell() {
     }
     wrapper.style.display = '';
 
+    const installBanner = (!isStandalone() && _pwaInstallPrompt) ? buildInstallBanner() : '';
+
     wrapper.innerHTML =
         buildMobileTopbar(unit, isEdit) +
         (mobileView === 'day' ? buildDayStrip() : buildMonthStripHeader()) +
+        installBanner +
         `<div id="mobileMain">` +
         (mobileView === 'day' ? buildDayView() : buildMonthView()) +
         `</div>` +
@@ -273,14 +301,59 @@ function buildMonthDayChips(daySlots) {
     return html;
 }
 
+// ── Banner de instalação (só no browser, não no app instalado) ─
+function buildInstallBanner() {
+    return `
+    <div style="margin:8px 10px 0;background:var(--s2);border:1px solid var(--accent);
+                border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;">
+      <div style="flex:1;">
+        <div style="font-size:10px;font-weight:900;color:var(--accent);letter-spacing:0.5px;">
+          MAPA DE SALA v${APP_VERSION}
+        </div>
+        <div style="font-size:10px;color:var(--t2);margin-top:2px;">
+          Instale o app para acesso rápido
+        </div>
+      </div>
+      <button onclick="triggerPwaInstall()"
+              style="background:var(--accent);color:#fff;border:none;border-radius:7px;
+                     padding:8px 14px;font-size:10px;font-weight:900;cursor:pointer;
+                     white-space:nowrap;-webkit-tap-highlight-color:transparent;">
+        ↓ Instalar
+      </button>
+    </div>`;
+}
+
+// ── Notificação de atualização ─────────────────────────────────
+function showMobileUpdateBanner() {
+    if (document.getElementById('mobileUpdateBanner')) return;
+    const el = document.createElement('div');
+    el.id = 'mobileUpdateBanner';
+    el.style.cssText = `position:fixed;top:56px;left:0;right:0;z-index:105;
+      background:var(--s1);border-bottom:2px solid var(--active);
+      padding:10px 14px;display:flex;align-items:center;gap:10px;`;
+    el.innerHTML = `
+      <span style="flex:1;font-size:12px;font-weight:700;color:var(--active);">
+        🔄 Nova versão disponível!
+      </span>
+      <button onclick="window.location.reload()"
+              style="background:var(--active);color:#111;border:none;border-radius:6px;
+                     padding:7px 14px;font-size:10px;font-weight:900;cursor:pointer;">
+        Atualizar
+      </button>`;
+    document.body.appendChild(el);
+}
+
 // ── Bottom Nav ─────────────────────────────────────────────────
 function buildBottomNav(isEdit) {
+    const canInstall = !isStandalone() && !!_pwaInstallPrompt;
     const moreMenu = mobileMoreOpen ? `
+    <div onclick="mobileMoreOpen=false; renderMain();"
+         style="position:fixed;inset:0;bottom:60px;z-index:100;"></div>
     <div id="mobileMoreMenu" style="
       position:fixed; bottom:60px; right:0;
       background:var(--s2); border:1px solid var(--border);
-      border-radius:12px 12px 0 0; min-width:180px;
-      box-shadow:0 -4px 24px rgba(0,0,0,0.4);
+      border-radius:12px 12px 0 0; min-width:200px;
+      box-shadow:0 -4px 24px rgba(0,0,0,0.5);
       z-index:101; overflow:hidden;">
       <button onclick="goToMobileToday(); mobileMoreOpen=false; renderMain();"
               style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
@@ -292,13 +365,22 @@ function buildBottomNav(isEdit) {
       <button onclick="${isEdit ? 'openConfig()' : 'openLock()'}; mobileMoreOpen=false; renderMain();"
               style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
                      background:transparent;border:none;color:var(--text);font-size:13px;
-                     font-weight:700;cursor:pointer;
+                     font-weight:700;cursor:pointer;border-bottom:1px solid var(--border);
                      -webkit-tap-highlight-color:transparent;">
         <span style="font-size:20px;">${isEdit ? '⚙️' : '🔒'}</span> ${isEdit ? 'Configurações' : 'Acesso'}
       </button>
-    </div>
-    <div onclick="mobileMoreOpen=false; renderMain();"
-         style="position:fixed;inset:0;bottom:60px;z-index:100;"></div>` : '';
+      ${canInstall ? `
+      <button onclick="triggerPwaInstall(); mobileMoreOpen=false;"
+              style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
+                     background:transparent;border:none;color:var(--accent);font-size:13px;
+                     font-weight:700;cursor:pointer;border-bottom:1px solid var(--border);
+                     -webkit-tap-highlight-color:transparent;">
+        <span style="font-size:20px;">📲</span> Instalar App
+      </button>` : ''}
+      <div style="padding:10px 18px;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.5px;">
+        MAPA DE SALA v${APP_VERSION}
+      </div>
+    </div>` : '';
 
     return `
     ${moreMenu}
@@ -499,9 +581,18 @@ window.addEventListener('resize', () => {
     _mobileResizeTimer = setTimeout(renderMain, 150);
 });
 
-// ── Service Worker (PWA) ───────────────────────────────────────
+// ── Service Worker (PWA + detecção de atualização) ────────────
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        showMobileUpdateBanner();
+                    }
+                });
+            });
+        }).catch(() => {});
     });
 }
