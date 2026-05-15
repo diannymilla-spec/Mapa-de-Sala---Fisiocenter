@@ -310,7 +310,7 @@ function renderPriceTable() {
         : '';
       return `<tr id="price-entry-${e.id}" style="border-bottom:${isLast ? '2px solid var(--border)' : '1px solid rgba(255,255,255,0.05)'};">
         <td style="padding:${idx===0?'10px':'6px'} 12px;vertical-align:${idx===0?'top':'middle'};">
-          ${idx===0 ? docHeader : '<span style="color:var(--t3);padding-left:6px;">└</span>'}
+          ${idx===0 ? docHeader : `<div style="font-size:11px;font-weight:600;color:var(--t2);padding-left:6px;">${d.name}</div>`}
         </td>
         <td style="padding:8px 12px;">${e.label || '—'}${natureBadge}</td>
         <td style="padding:8px 12px;font-weight:700;color:${ppColor};">${pp}</td>
