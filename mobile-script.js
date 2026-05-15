@@ -54,10 +54,7 @@ renderMain = function () {
 
 // ── Shell principal ────────────────────────────────────────────
 function renderMobileShell() {
-    // Garante que o mainContent (desktop) fica oculto
     const mc = document.getElementById('mainContent');
-    if (mc) mc.style.display = 'none';
-
     const unit   = S.units.find(u => u.id === S.currentUnit);
     const isEdit = isEditActive(S.currentUnit);
 
@@ -68,6 +65,21 @@ function renderMobileShell() {
         wrapper.className = 'mobile-content-wrapper';
         document.body.appendChild(wrapper);
     }
+
+    // ── Modo Tabela de Preços: usa o mainContent desktop ──────
+    if (mobileView === 'priceTable') {
+        document.body.classList.add('mobile-price-table');
+        if (mc) mc.style.setProperty('display', 'block', 'important');
+        wrapper.style.display = '';
+        wrapper.innerHTML = buildMobileTopbar(unit, isEdit) + buildBottomNav(isEdit);
+        S.view = 'priceTable';
+        _originalRenderMain();
+        return;
+    }
+
+    // ── Modos normais ──────────────────────────────────────────
+    document.body.classList.remove('mobile-price-table');
+    if (mc) mc.style.display = 'none';
     wrapper.style.display = '';
 
     const installBanner = (!isStandalone() && _pwaInstallPrompt) ? buildInstallBanner() : '';
@@ -90,6 +102,9 @@ function buildMobileTopbar(unit, isEdit) {
     <div class="mobile-topbar">
       <div class="mobile-topbar-title">Mapa de Sala</div>
       <span class="mobile-unit-badge" onclick="openMobileUnitPicker()">${unit ? unit.name : '—'}</span>
+      <button class="mobile-topbar-btn ${mobileView==='priceTable' ? 'edit-active' : ''}"
+              onclick="mobileMoreOpen=false; mobileView=(mobileView==='priceTable'?'day':'priceTable'); renderMain();"
+              title="Tabela de Preços">💰</button>
       <button class="mobile-topbar-btn" onclick="mobileMoreOpen=false; openSearch();" title="Buscar">🔍</button>
       <button class="mobile-topbar-btn" onclick="toggleTheme()" title="Tema">🌓</button>
       <button class="mobile-topbar-btn ${isEdit ? 'edit-active' : ''}"
@@ -374,6 +389,10 @@ function buildBottomNav(isEdit) {
       z-index:101; overflow:hidden;">
       <div style="padding:8px 16px 6px;font-size:8px;font-weight:900;color:var(--t3);
                   letter-spacing:1px;border-bottom:1px solid var(--border);">ATALHOS</div>
+      <button onclick="mobileMoreOpen=false; mobileView='priceTable'; renderMain();" style="${btnStyle}">
+        <span style="${iconStyle}">💰</span>
+        <div><div style="${labelStyle}">Tabela de Preços</div><div style="${descStyle}">Consultar e editar valores</div></div>
+      </button>
       <button onclick="toggleTheme(); mobileMoreOpen=false; renderMain();" style="${btnStyle}">
         <span style="${iconStyle}">🌓</span>
         <div><div style="${labelStyle}">Tema</div><div style="${descStyle}">Claro e escuro</div></div>

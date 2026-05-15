@@ -328,3 +328,22 @@
   body.light-theme .mobile-slot-name { color: #162033; font-weight: 800; }
   body.light-theme .mobile-slot.slot-active { background: rgba(15,159,110,0.07); }
 }
+
+/* ── Tabela de Preços acessível no mobile ── */
+@media (max-width: 768px) {
+  body.mobile-price-table #mainContent {
+    display: block !important;
+    padding-top: 56px;
+    padding-bottom: 68px;
+    overflow-y: auto !important;
+    height: auto !important;
+    flex: none !important;
+  }
+  body.mobile-price-table .mobile-content-wrapper {
+    pointer-events: none;
+  }
+  body.mobile-price-table .mobile-topbar,
+  body.mobile-price-table .mobile-bottom-nav {
+    pointer-events: auto;
+  }
+}
