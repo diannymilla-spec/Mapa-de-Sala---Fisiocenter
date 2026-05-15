@@ -90,6 +90,7 @@ function buildMobileTopbar(unit, isEdit) {
     <div class="mobile-topbar">
       <div class="mobile-topbar-title">Mapa de Sala</div>
       <span class="mobile-unit-badge" onclick="openMobileUnitPicker()">${unit ? unit.name : '—'}</span>
+      <button class="mobile-topbar-btn" onclick="mobileMoreOpen=false; openSearch();" title="Buscar">🔍</button>
       <button class="mobile-topbar-btn" onclick="toggleTheme()" title="Tema">🌓</button>
       <button class="mobile-topbar-btn ${isEdit ? 'edit-active' : ''}"
               onclick="${isEdit ? 'exitConfigMode()' : 'openLock()'}"
@@ -124,13 +125,13 @@ function buildDayStrip() {
 
     html += `
       <div class="mobile-week-nav"><button onclick="mobileNextWeek()">›</button></div>
-      <button onclick="mobileMoreOpen=false; openSearch();"
+      <button onclick="goToMobileToday(); mobileMoreOpen=false;"
               style="width:32px;height:32px;background:var(--s3);
                      border:1px solid var(--border);border-radius:8px;
-                     color:var(--t2);font-size:16px;cursor:pointer;flex-shrink:0;
+                     font-size:16px;cursor:pointer;flex-shrink:0;
                      display:flex;align-items:center;justify-content:center;
                      margin:4px 2px;-webkit-tap-highlight-color:transparent;">
-        🔍
+        ⭐
       </button>
     </div>`;
     return html;
@@ -355,38 +356,48 @@ function showMobileUpdateBanner() {
 // ── Bottom Nav ─────────────────────────────────────────────────
 function buildBottomNav(isEdit) {
     const canInstall = !isStandalone() && !!_pwaInstallPrompt;
+    const btnStyle = `width:100%;display:flex;align-items:center;gap:14px;padding:12px 16px;
+                      background:transparent;border:none;border-bottom:1px solid var(--border);
+                      cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:left;`;
+    const iconStyle = `font-size:22px;flex-shrink:0;`;
+    const labelStyle = `font-size:13px;font-weight:700;color:var(--text);`;
+    const descStyle  = `font-size:10px;color:var(--t3);margin-top:1px;`;
+
     const moreMenu = mobileMoreOpen ? `
     <div onclick="mobileMoreOpen=false; renderMain();"
          style="position:fixed;inset:0;z-index:100;"></div>
     <div id="mobileMoreMenu" style="
       position:fixed; bottom:64px; right:8px;
       background:var(--s2); border:1px solid var(--border);
-      border-radius:12px; min-width:200px;
+      border-radius:14px; min-width:220px;
       box-shadow:0 -4px 24px rgba(0,0,0,0.5);
       z-index:101; overflow:hidden;">
-      <button onclick="goToMobileToday(); mobileMoreOpen=false; renderMain();"
-              style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
-                     background:transparent;border:none;color:var(--text);font-size:13px;
-                     font-weight:700;cursor:pointer;border-bottom:1px solid var(--border);
-                     -webkit-tap-highlight-color:transparent;">
-        <span style="font-size:20px;">⭐</span> Ir para Hoje
+      <div style="padding:8px 16px 6px;font-size:8px;font-weight:900;color:var(--t3);
+                  letter-spacing:1px;border-bottom:1px solid var(--border);">ATALHOS</div>
+      <button onclick="toggleTheme(); mobileMoreOpen=false; renderMain();" style="${btnStyle}">
+        <span style="${iconStyle}">🌓</span>
+        <div><div style="${labelStyle}">Tema</div><div style="${descStyle}">Claro e escuro</div></div>
       </button>
-      <button onclick="${isEdit ? 'openConfig()' : 'openLock()'}; mobileMoreOpen=false; renderMain();"
-              style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
-                     background:transparent;border:none;color:var(--text);font-size:13px;
-                     font-weight:700;cursor:pointer;border-bottom:1px solid var(--border);
-                     -webkit-tap-highlight-color:transparent;">
-        <span style="font-size:20px;">${isEdit ? '⚙️' : '🔒'}</span> ${isEdit ? 'Configurações' : 'Acesso'}
+      <button onclick="openSearch(); mobileMoreOpen=false;" style="${btnStyle}">
+        <span style="${iconStyle}">🔍</span>
+        <div><div style="${labelStyle}">Buscar</div><div style="${descStyle}">Encontrar médico</div></div>
+      </button>
+      <button onclick="goToMobileToday(); mobileMoreOpen=false; renderMain();" style="${btnStyle}">
+        <span style="${iconStyle}">⭐</span>
+        <div><div style="${labelStyle}">Ir para Hoje</div><div style="${descStyle}">Voltar ao dia atual</div></div>
+      </button>
+      <button onclick="${isEdit ? 'openConfig()' : 'openLock()'}; mobileMoreOpen=false; renderMain();" style="${btnStyle}">
+        <span style="${iconStyle}">${isEdit ? '⚙️' : '🔒'}</span>
+        <div><div style="${labelStyle}">${isEdit ? 'Configurações' : 'Acesso'}</div>
+             <div style="${descStyle}">${isEdit ? 'Modo edição ativo' : 'Entrar para editar'}</div></div>
       </button>
       ${canInstall ? `
-      <button onclick="triggerPwaInstall(); mobileMoreOpen=false;"
-              style="width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;
-                     background:transparent;border:none;color:var(--accent);font-size:13px;
-                     font-weight:700;cursor:pointer;border-bottom:1px solid var(--border);
-                     -webkit-tap-highlight-color:transparent;">
-        <span style="font-size:20px;">📲</span> Instalar App
+      <button onclick="triggerPwaInstall(); mobileMoreOpen=false;" style="${btnStyle}color:var(--accent);">
+        <span style="${iconStyle}">📲</span>
+        <div><div style="font-size:13px;font-weight:700;color:var(--accent);">Instalar App</div>
+             <div style="${descStyle}">Adicionar à tela inicial</div></div>
       </button>` : ''}
-      <div style="padding:10px 18px;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.5px;">
+      <div style="padding:8px 16px;font-size:9px;color:var(--t3);font-weight:700;letter-spacing:0.5px;">
         MAPA DE SALA v${APP_VERSION}
       </div>
     </div>` : '';
