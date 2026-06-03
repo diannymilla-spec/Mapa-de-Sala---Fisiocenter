@@ -71,6 +71,7 @@ let curTgl = {
 };
 
 let _pendingDocEntries = [];
+let _docEntryListId = 'doc-entries-list';
 
 // ── FORÇAR TEXTOS (MAIÚSCULAS/TITLE CASE) ──
 document.addEventListener('input', function(e) {
@@ -1484,55 +1485,95 @@ function renderCfgBody(tab) {
         const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
         const activeDocs   = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived).sort(sortByName);
         const archivedDocs = S.doctors.filter(d => d.unitId === S.currentUnit && d.archived).sort(sortByName);
+        _pendingDocEntries = [];
+        _docEntryListId = 'doc-entries-list';
         body.innerHTML = `
-            <div class="form-group" style="margin-bottom:15px;">
-                <label class="form-label" style="font-size:11px; text-transform:none; letter-spacing:0;">
-                    Adicionando médicos na unidade: <strong style="color:var(--accent); text-transform:uppercase;">${unit.name}</strong>
-                </label>
-            </div>
-            <div style="background:var(--s2);padding:15px;border-radius:4px;border:1px solid var(--border)">
-                <div class="form-group"><label class="form-label">Título</label><div class="toggle-group" id="tglPrefix"><button class="tgl-btn active" onclick="setTgl('tglPrefix',this,'Dr.')">Dr.</button><button class="tgl-btn" onclick="setTgl('tglPrefix',this,'Dra.')">Dra.</button></div></div>
-                <div class="form-group"><label class="form-label">Nome Completo</label><input type="text" class="inp" id="newDocName"></div>
-                <div class="form-group"><label class="form-label">Especialidade</label><input type="text" class="inp" id="newDocSpec"></div>
-                <div class="form-group"><label class="form-label">Tipo de Atendimento</label><div class="toggle-group" id="tglType"><button class="tgl-btn active" onclick="setTgl('tglType',this,'hora')">Hora Marcada</button><button class="tgl-btn" onclick="setTgl('tglType',this,'ordem')">Ordem de Chegada</button></div></div>
-                <div class="form-group">
-                    <label class="form-label">Natureza Padrão <span style="color:var(--t3);font-weight:400;text-transform:none;">(opcional — sobrepõe a agenda)</span></label>
-                    <div id="tglDefaultNature" style="display:flex;flex-direction:column;gap:6px;">
-                        <div style="display:flex;gap:6px;">
-                            <button class="tgl-btn active" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'','newDocPrices')">Nenhuma</button>
-                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta','newDocPrices')">Consulta</button>
+            <div id="docAddForm" style="background:var(--s2);padding:16px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
+                <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">
+                    Novo Profissional — <span style="color:var(--accent);">${unit.name}</span>
+                </div>
+
+                <!-- Linha 1: Dr./Dra. + Nome -->
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                    <div class="toggle-group" id="tglPrefix" style="flex-shrink:0;width:auto;">
+                        <button class="tgl-btn active" data-val="Dr." onclick="setTgl('tglPrefix',this,'Dr.')">Dr.</button>
+                        <button class="tgl-btn" data-val="Dra." onclick="setTgl('tglPrefix',this,'Dra.')">Dra.</button>
+                    </div>
+                    <input type="text" class="inp" id="newDocName" placeholder="Nome Completo" style="flex:1;">
+                </div>
+
+                <!-- Linha 2: Tipo + Natureza lado a lado -->
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+                    <div style="flex:1;min-width:160px;">
+                        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:4px;">Tipo de Atendimento</label>
+                        <div class="toggle-group" id="tglType">
+                            <button class="tgl-btn active" data-val="hora" onclick="setTgl('tglType',this,'hora')">Hora Marcada</button>
+                            <button class="tgl-btn" data-val="ordem" onclick="setTgl('tglType',this,'ordem')">Ordem de Chegada</button>
                         </div>
-                        <div style="display:flex;gap:6px;">
-                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Consulta/Sessão','newDocPrices')">Consulta/Sessão</button>
-                            <button class="tgl-btn" style="flex:1" onclick="setTglWithPrices('tglDefaultNature',this,'Procedimento','newDocPrices')">Procedimento</button>
+                    </div>
+                    <div style="flex:1;min-width:200px;">
+                        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:4px;">Natureza Padrão <span style="font-weight:400;text-transform:none;font-style:italic;">(opcional)</span></label>
+                        <div class="toggle-group" id="tglDefaultNature" style="flex-wrap:wrap;">
+                            <button class="tgl-btn active" data-val="" onclick="setTgl('tglDefaultNature',this,'')">Nenhuma</button>
+                            <button class="tgl-btn" data-val="Consulta" onclick="setTgl('tglDefaultNature',this,'Consulta')">Consulta</button>
+                            <button class="tgl-btn" data-val="Consulta/Sessão" onclick="setTgl('tglDefaultNature',this,'Consulta/Sessão')">C/Sessão</button>
+                            <button class="tgl-btn" data-val="Procedimento" onclick="setTgl('tglDefaultNature',this,'Procedimento')">Procedimento</button>
                         </div>
                     </div>
                 </div>
-                <div id="newDocPrices" style="display:none; background:var(--s1); border:1px solid var(--border); border-radius:4px; padding:10px; margin-top:4px; margin-bottom:8px;">
-                    <label class="form-label" style="margin-bottom:8px;">Valores de Consulta</label>
-                    <div style="display:flex; gap:8px;">
+
+                <div style="border-top:1px solid var(--border);margin:12px 0;"></div>
+
+                <!-- Linha 3: Especialidade + valores lado a lado -->
+                <div style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-bottom:6px;">Adicionar Especialidade</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
+                    <div style="flex:2;min-width:130px;">
+                        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Especialidade</label>
+                        <input type="text" class="inp" id="doc-ent-label" placeholder="Ex: Ginecologia" style="padding:6px 8px;" maxlength="60">
+                    </div>
+                    <div style="flex-shrink:0;">
+                        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Natureza</label>
+                        <select id="doc-ent-nature" class="sel" onchange="docEntNatureChange()" style="padding:6px 8px;font-size:11px;">
+                            <option value="">Todos</option>
+                            <option value="Consulta">Consulta</option>
+                            <option value="Consulta/Sessão">C/Sessão</option>
+                            <option value="Procedimento">Procedimento</option>
+                        </select>
+                    </div>
+                    <div id="doc-ent-prices" style="display:flex;gap:8px;flex:2;min-width:160px;">
                         <div style="flex:1;">
-                            <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">PARTICULAR (R$)</label>
-                            <input type="text" class="inp" id="newDocPriceParticular" placeholder="0,00" style="padding:6px 8px;">
+                            <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Particular R$</label>
+                            <input type="text" class="inp" id="doc-ent-pp" placeholder="0,00" style="padding:6px 8px;">
                         </div>
                         <div style="flex:1;">
-                            <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">CARTÃO FISIOCENTER (R$)</label>
-                            <input type="text" class="inp" id="newDocPriceCartao" placeholder="0,00" style="padding:6px 8px;">
+                            <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Cartão R$</label>
+                            <input type="text" class="inp" id="doc-ent-pc" placeholder="0,00" style="padding:6px 8px;">
                         </div>
                     </div>
                 </div>
-                <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:4px;">Especialidades e Valores</label>
-                <div id="docEntriesList"></div>
-                <div id="docEntriesAddForm"></div>
-                <button class="btn btn-ghost" style="width:100%;padding:6px;font-size:10px;margin-top:4px;margin-bottom:8px;" onclick="showAddDocEntryForm()">+ Adicionar Especialidade</button>
-                <button class="btn btn-primary" style="width:100%" onclick="addDoctor()">Cadastrar Médico</button>
+
+                <!-- Linha 4: ações da entrada -->
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <button class="btn btn-ghost" style="flex:1;" onclick="cancelDocEntry()">✕ Limpar</button>
+                    <button class="btn btn-primary" style="flex:1;" onclick="confirmAddDocEntry()">+ Adicionar Especialidade</button>
+                </div>
+
+                <!-- Linha 5: lista de especialidades -->
+                <div id="doc-entries-list">
+                    <div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade adicionada.</div>
+                </div>
+
+                <div style="border-top:1px solid var(--border);margin:12px 0;"></div>
+
+                <!-- Linha 6: cadastrar -->
+                <button class="btn btn-primary" style="width:100%;padding:10px;font-size:13px;" onclick="addDoctor()">✓ Cadastrar Médico</button>
             </div>
 
-            <div style="margin-top:20px">${activeDocs.map(d => `
+            <div>${activeDocs.map(d => `
                 <div class="cfg-row" id="row-d-${d.id}">
                     <div style="display:flex; flex-direction:column">
-                        <strong id="txt-d-name-${d.id}">${d.name}</strong>
-                        <small id="txt-d-spec-${d.id}">${d.spec}</small>
+                        <strong>${d.name}</strong>
+                        <small>${d.spec}</small>
                     </div>
                     <div class="cfg-row-actions">
                         <button class="btn btn-edit" onclick="editDoctor('${d.id}')">✎</button>
@@ -1560,7 +1601,7 @@ function renderCfgBody(tab) {
                 </div>`).join('')}
             </div>` : ''}
         `;
-        setTimeout(() => initDocEntries(null), 30);
+        setTimeout(() => { const inp = document.getElementById('newDocName'); if (inp) inp.focus(); }, 30);
     } else {
         const activeRooms   = unit.rooms.filter(r => !r.archived && !r.archivedFrom);
         const archivedRooms = unit.rooms.filter(r => r.archived || r.archivedFrom);
@@ -1647,124 +1688,85 @@ function setEditTglWithPrices(gid, btn, priceGroupId) {
 }
 
 // ── Gestão de entradas de especialidade no formulário de médico ──
-function initDocEntries(doctorId) {
-    if (doctorId) {
-        const d = S.doctors.find(x => x.id === doctorId);
-        const existing = (S.priceEntries || []).filter(e => e.doctorId === doctorId && e.unitId === S.currentUnit);
-        if (existing.length > 0) {
-            _pendingDocEntries = existing.map(e => ({...e}));
-        } else if (d && (d.priceParticular || d.priceCartao)) {
-            _pendingDocEntries = [{ id: 'pe_tmp_' + Date.now(), label: d.spec || (d.defaultNature || 'Consulta'), nature: d.defaultNature || 'Consulta', priceParticular: d.priceParticular || null, priceCartao: d.priceCartao || null }];
-        } else {
-            _pendingDocEntries = [];
-        }
-    } else {
-        _pendingDocEntries = [];
-    }
-    renderDocEntriesList();
+function docEntNatureChange() {
+    const val = document.getElementById('doc-ent-nature')?.value;
+    const el = document.getElementById('doc-ent-prices');
+    if (el) el.style.display = val === 'Procedimento' ? 'none' : 'flex';
 }
 
 function renderDocEntriesList() {
-    let el = document.getElementById('docEntriesList');
-    if (!el) {
-        const all = document.querySelectorAll('[id^="docEntriesList-"]');
-        if (all.length > 0) el = all[all.length - 1];
-    }
+    const el = document.getElementById(_docEntryListId);
     if (!el) return;
     if (_pendingDocEntries.length === 0) {
-        el.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade. Clique em + Adicionar.</div>';
+        el.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade adicionada.</div>';
         return;
     }
     el.innerHTML = _pendingDocEntries.map((e, i) => {
-        const natureBadge = e.nature ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>` : '';
+        const natureBadge = e.nature
+            ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>`
+            : '';
         const ppStr = (e.nature !== 'Procedimento' && e.priceParticular) ? `<span style="color:var(--active);font-size:11px;font-weight:700;">R$ ${e.priceParticular}</span>` : '';
-        const pcStr = (e.nature !== 'Procedimento' && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;">Cartão: R$ ${e.priceCartao}</span>` : '';
+        const pcStr = (e.nature !== 'Procedimento' && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;font-weight:600;">Cartão: R$ ${e.priceCartao}</span>` : '';
         return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s1);border-radius:4px;margin-bottom:4px;">
             ${natureBadge}
             <span style="flex:1;font-size:11px;font-weight:600;">${e.label}</span>
-            ${ppStr}${pcStr}
-            <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="removeDocEntry(${i})">✕</button>
+            <span style="display:flex;gap:8px;align-items:center;">${ppStr}${pcStr}</span>
+            <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;flex-shrink:0;" onclick="removeDocEntry(${i})">✕</button>
         </div>`;
     }).join('');
 }
 
 function removeDocEntry(idx) {
     _pendingDocEntries.splice(idx, 1);
-    // Try edit-context list first, then add-form list
-    const editEl = document.querySelector('[id^="docEntriesList-"]');
-    if (editEl) {
-        if (_pendingDocEntries.length === 0) {
-            editEl.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade. Clique em + Adicionar.</div>';
-        } else {
-            editEl.innerHTML = _pendingDocEntries.map((e, i) => {
-                const natureBadge = e.nature ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>` : '';
-                const ppStr = (e.nature !== 'Procedimento' && e.priceParticular) ? `<span style="color:var(--active);font-size:11px;font-weight:700;">R$ ${e.priceParticular}</span>` : '';
-                const pcStr = (e.nature !== 'Procedimento' && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;">Cartão: R$ ${e.priceCartao}</span>` : '';
-                return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s1);border-radius:4px;margin-bottom:4px;">
-                    ${natureBadge}
-                    <span style="flex:1;font-size:11px;font-weight:600;">${e.label}</span>
-                    ${ppStr}${pcStr}
-                    <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="removeDocEntry(${i})">✕</button>
-                </div>`;
-            }).join('');
-        }
-    } else {
-        renderDocEntriesList();
-    }
+    renderDocEntriesList();
 }
 
-function showAddDocEntryForm(suffix) {
-    const afId = suffix ? 'docEntriesAddForm-' + suffix : 'docEntriesAddForm';
-    const af = document.getElementById(afId);
-    if (!af) return;
-    af.innerHTML = `
-        <div style="background:rgba(79,142,247,0.07);border:1px dashed rgba(79,142,247,0.4);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-            <input type="text" class="inp" id="nde-label" placeholder="Especialidade (ex: Clínica Geral)" style="padding:6px 8px;">
-            <select id="nde-nature" class="sel" onchange="toggleDocEntryPrices(this.value)" style="padding:6px 8px;font-size:11px;">
-                <option value="">Todos (sem filtro)</option>
-                <option value="Consulta">Consulta</option>
-                <option value="Consulta/Sessão">Consulta/Sessão</option>
-                <option value="Procedimento">Procedimento</option>
-            </select>
-            <div id="nde-prices" style="display:flex;gap:8px;">
-                <div style="flex:1;"><label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:3px;">PARTICULAR (R$)</label><input type="text" class="inp" id="nde-pp" placeholder="0,00" style="padding:6px 8px;"></div>
-                <div style="flex:1;"><label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:3px;">CARTÃO FISIOCENTER (R$)</label><input type="text" class="inp" id="nde-pc" placeholder="0,00" style="padding:6px 8px;"></div>
-            </div>
-            <div style="display:flex;gap:6px;">
-                <button class="btn btn-ghost" style="flex:1;padding:6px;" onclick="document.getElementById('${suffix ? 'docEntriesAddForm-'+suffix : 'docEntriesAddForm'}').innerHTML=''">✕ Cancelar</button>
-                <button class="btn btn-primary" style="flex:1;padding:6px;" onclick="confirmAddDocEntry()">✓ Adicionar</button>
-            </div>
-        </div>`;
-    setTimeout(() => { const inp = document.getElementById('nde-label'); if(inp) inp.focus(); }, 30);
-}
-
-function toggleDocEntryPrices(val) {
-    const el = document.getElementById('nde-prices');
-    if (el) el.style.display = val === 'Procedimento' ? 'none' : 'flex';
+function cancelDocEntry() {
+    const l = document.getElementById('doc-ent-label');
+    const n = document.getElementById('doc-ent-nature');
+    const pp = document.getElementById('doc-ent-pp');
+    const pc = document.getElementById('doc-ent-pc');
+    if (l) { l.value = ''; l.focus(); }
+    if (n) n.value = '';
+    if (pp) pp.value = '';
+    if (pc) pc.value = '';
+    const pricesEl = document.getElementById('doc-ent-prices');
+    if (pricesEl) pricesEl.style.display = 'flex';
 }
 
 function confirmAddDocEntry() {
-    const label = document.getElementById('nde-label')?.value.trim();
+    const label = document.getElementById('doc-ent-label')?.value.trim();
     if (!label) { showToast('INFORME A ESPECIALIDADE'); return; }
-    const nature = document.getElementById('nde-nature')?.value || null;
-    const pp = (nature !== 'Procedimento') ? document.getElementById('nde-pp')?.value.trim() : '';
-    const pc = (nature !== 'Procedimento') ? document.getElementById('nde-pc')?.value.trim() : '';
+    if (label.length > 60) { showToast('ESPECIALIDADE MUITO LONGA (máx 60 chars)'); return; }
+    const nature = document.getElementById('doc-ent-nature')?.value || null;
+    const pp = nature !== 'Procedimento' ? document.getElementById('doc-ent-pp')?.value.trim() : '';
+    const pc = nature !== 'Procedimento' ? document.getElementById('doc-ent-pc')?.value.trim() : '';
+    if (nature && nature !== 'Procedimento' && !pp && !pc) {
+        showToast('INFORME AO MENOS UM VALOR (Particular ou Cartão)');
+        return;
+    }
     _pendingDocEntries.push({ id: 'pe_' + Date.now(), label, nature: nature || null, priceParticular: pp || null, priceCartao: pc || null });
     renderDocEntriesList();
-    const af1 = document.getElementById('docEntriesAddForm');
-    if (af1) af1.innerHTML = '';
-    const af2 = document.querySelector('[id^="docEntriesAddForm-"]');
-    if (af2) af2.innerHTML = '';
+    cancelDocEntry();
 }
 
 function editDoctor(id) {
     const d = S.doctors.find(x => x.id === id);
+    if (!d) return;
     const row = document.getElementById(`row-d-${id}`);
+    if (!row) return;
 
-    let prefix = d.name.startsWith('Dra.') ? 'Dra.' : 'Dr.';
-    let cleanName = d.name.replace('Dr. ', '').replace('Dra. ', '');
-    let type = d.type || 'hora';
-    let defNature = d.defaultNature || '';
+    // Oculta o formulário de adição no topo enquanto edita
+    const addForm = document.getElementById('docAddForm');
+    if (addForm) addForm.style.display = 'none';
+
+    _docEntryListId = 'doc-entries-list-' + id;
+    _pendingDocEntries = (S.priceEntries || []).filter(e => e.doctorId === id && e.unitId === S.currentUnit).map(e => ({...e}));
+
+    const prefix = d.name.startsWith('Dra.') ? 'Dra.' : 'Dr.';
+    const cleanName = d.name.replace(/^(Dr\.|Dra\.)\s+/, '');
+    const type = d.type || 'hora';
+    const defNature = d.defaultNature || '';
     const docConvenios = d.convenios || [];
     const docProcs = d.procedimentos || [];
 
@@ -1792,126 +1794,130 @@ function editDoctor(id) {
         </div>` : '';
 
     row.innerHTML = `
-        <div style="display:flex; flex-direction:column; flex:1; gap:8px">
-            <div class="toggle-group" id="edit-tglPrefix-${id}">
-                <button class="tgl-btn ${prefix === 'Dr.' ? 'active' : ''}" data-val="Dr." onclick="setEditTgl('edit-tglPrefix-${id}', this)">Dr.</button>
-                <button class="tgl-btn ${prefix === 'Dra.' ? 'active' : ''}" data-val="Dra." onclick="setEditTgl('edit-tglPrefix-${id}', this)">Dra.</button>
-            </div>
-            <input type="text" class="inp" id="edit-d-name-${id}" value="${cleanName}" placeholder="Nome">
-            <input type="text" class="inp" id="edit-d-spec-${id}" value="${d.spec}" placeholder="Especialidade">
-            <div class="toggle-group" id="edit-tglType-${id}">
-                <button class="tgl-btn ${type === 'hora' ? 'active' : ''}" data-val="hora" onclick="setEditTgl('edit-tglType-${id}', this)">Hora Marcada</button>
-                <button class="tgl-btn ${type === 'ordem' ? 'active' : ''}" data-val="ordem" onclick="setEditTgl('edit-tglType-${id}', this)">Ordem de Chegada</button>
-            </div>
-            <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;">Natureza Padrão <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
-            <div id="edit-tglDefNature-${id}" style="display:flex;flex-direction:column;gap:6px;">
-                <div style="display:flex;gap:6px;">
-                    <button class="tgl-btn ${defNature === '' ? 'active' : ''}" style="flex:1" data-val="" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Nenhuma</button>
-                    <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" style="flex:1" data-val="Consulta" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta</button>
+        <div style="display:flex;flex-direction:column;flex:1;background:var(--s2);padding:16px;border-radius:8px;border:1px solid var(--accent);">
+            <div style="font-size:9px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Editando Profissional</div>
+
+            <!-- Linha 1: Dr./Dra. + Nome -->
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                <div class="toggle-group" id="edit-tglPrefix-${id}" style="flex-shrink:0;width:auto;">
+                    <button class="tgl-btn ${prefix === 'Dr.' ? 'active' : ''}" data-val="Dr." onclick="setEditTgl('edit-tglPrefix-${id}', this)">Dr.</button>
+                    <button class="tgl-btn ${prefix === 'Dra.' ? 'active' : ''}" data-val="Dra." onclick="setEditTgl('edit-tglPrefix-${id}', this)">Dra.</button>
                 </div>
-                <div style="display:flex;gap:6px;">
-                    <button class="tgl-btn ${defNature === 'Consulta/Sessão' ? 'active' : ''}" style="flex:1" data-val="Consulta/Sessão" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Consulta/Sessão</button>
-                    <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" style="flex:1" data-val="Procedimento" onclick="setEditTglWithPrices('edit-tglDefNature-${id}', this, 'edit-prices-${id}')">Procedimento</button>
-                </div>
+                <input type="text" class="inp" id="edit-d-name-${id}" value="${cleanName}" placeholder="Nome Completo" style="flex:1;">
             </div>
-            <div id="edit-prices-${id}" style="display:${(defNature === 'Consulta' || defNature === 'Consulta/Sessão') ? '' : 'none'}; background:var(--s1); border:1px solid var(--border); border-radius:4px; padding:10px; margin-top:4px;">
-                <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:8px;text-transform:uppercase;">Valores de Consulta</label>
-                <div style="display:flex; gap:8px;">
-                    <div style="flex:1;">
-                        <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">PARTICULAR (R$)</label>
-                        <input type="text" class="inp" id="edit-price-particular-${id}" value="${d.priceParticular || ''}" placeholder="0,00" style="padding:6px 8px;">
+
+            <!-- Linha 2: Tipo + Natureza lado a lado -->
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+                <div style="flex:1;min-width:160px;">
+                    <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:4px;">Tipo de Atendimento</label>
+                    <div class="toggle-group" id="edit-tglType-${id}">
+                        <button class="tgl-btn ${type === 'hora' ? 'active' : ''}" data-val="hora" onclick="setEditTgl('edit-tglType-${id}', this)">Hora Marcada</button>
+                        <button class="tgl-btn ${type === 'ordem' ? 'active' : ''}" data-val="ordem" onclick="setEditTgl('edit-tglType-${id}', this)">Ordem de Chegada</button>
                     </div>
-                    <div style="flex:1;">
-                        <label style="font-size:9px;color:var(--t3);font-weight:800;display:block;margin-bottom:4px;">CARTÃO FISIOCENTER (R$)</label>
-                        <input type="text" class="inp" id="edit-price-cartao-${id}" value="${d.priceCartao || ''}" placeholder="0,00" style="padding:6px 8px;">
+                </div>
+                <div style="flex:1;min-width:200px;">
+                    <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:4px;">Natureza Padrão <span style="font-weight:400;text-transform:none;font-style:italic;">(opcional)</span></label>
+                    <div class="toggle-group" id="edit-tglDefNature-${id}" style="flex-wrap:wrap;">
+                        <button class="tgl-btn ${defNature === '' ? 'active' : ''}" data-val="" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Nenhuma</button>
+                        <button class="tgl-btn ${defNature === 'Consulta' ? 'active' : ''}" data-val="Consulta" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Consulta</button>
+                        <button class="tgl-btn ${defNature === 'Consulta/Sessão' ? 'active' : ''}" data-val="Consulta/Sessão" onclick="setEditTgl('edit-tglDefNature-${id}', this)">C/Sessão</button>
+                        <button class="tgl-btn ${defNature === 'Procedimento' ? 'active' : ''}" data-val="Procedimento" onclick="setEditTgl('edit-tglDefNature-${id}', this)">Procedimento</button>
                     </div>
                 </div>
             </div>
-            <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-top:4px;display:block;">Especialidades e Valores</label>
-            <div id="docEntriesList-${id}" style="margin-top:4px;"></div>
-            <div id="docEntriesAddForm-${id}"></div>
-            <button class="btn btn-ghost" style="width:100%;padding:6px;font-size:10px;margin-top:4px;" onclick="showAddDocEntryForm('${id}')">+ Adicionar Especialidade</button>
+
+            <div style="border-top:1px solid var(--border);margin:12px 0;"></div>
+
+            <!-- Linha 3: Especialidade + valores -->
+            <div style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;margin-bottom:6px;">Adicionar Especialidade</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
+                <div style="flex:2;min-width:130px;">
+                    <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Especialidade</label>
+                    <input type="text" class="inp" id="doc-ent-label" placeholder="Ex: Ginecologia" style="padding:6px 8px;" maxlength="60">
+                </div>
+                <div style="flex-shrink:0;">
+                    <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Natureza</label>
+                    <select id="doc-ent-nature" class="sel" onchange="docEntNatureChange()" style="padding:6px 8px;font-size:11px;">
+                        <option value="">Todos</option>
+                        <option value="Consulta">Consulta</option>
+                        <option value="Consulta/Sessão">C/Sessão</option>
+                        <option value="Procedimento">Procedimento</option>
+                    </select>
+                </div>
+                <div id="doc-ent-prices" style="display:flex;gap:8px;flex:2;min-width:160px;">
+                    <div style="flex:1;">
+                        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Particular R$</label>
+                        <input type="text" class="inp" id="doc-ent-pp" placeholder="0,00" style="padding:6px 8px;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Cartão R$</label>
+                        <input type="text" class="inp" id="doc-ent-pc" placeholder="0,00" style="padding:6px 8px;">
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <button class="btn btn-ghost" style="flex:1;" onclick="cancelDocEntry()">✕ Limpar</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="confirmAddDocEntry()">+ Adicionar Especialidade</button>
+            </div>
+
+            <!-- Lista de especialidades -->
+            <div id="doc-entries-list-${id}"></div>
+
             ${convHtml}
             ${procHtml}
-            <div style="display:flex;gap:8px;margin-top:4px;">
-                <button class="btn btn-ghost" style="flex:1" onclick="renderCfgBody('medicos')">✕ Cancelar</button>
-                <button class="btn btn-primary" style="flex:1" onclick="saveDoctorEdit('${id}')">✓ Salvar</button>
+
+            <div style="border-top:1px solid var(--border);margin:12px 0;"></div>
+
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-ghost" style="flex:1;" onclick="_pendingDocEntries=[];_docEntryListId='doc-entries-list';renderCfgBody('medicos')">✕ Cancelar</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="saveDoctorEdit('${id}')">✓ Salvar</button>
             </div>
         </div>
     `;
-    setTimeout(() => {
-        _pendingDocEntries = (S.priceEntries || []).filter(e => e.doctorId === id && e.unitId === S.currentUnit).map(e => ({...e}));
-        const el = document.getElementById('docEntriesList-' + id);
-        if (!el) return;
-        if (_pendingDocEntries.length === 0) {
-            el.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade. Clique em + Adicionar.</div>';
-            return;
-        }
-        el.innerHTML = _pendingDocEntries.map((e, i) => {
-            const natureBadge = e.nature ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>` : '';
-            const ppStr = (e.nature !== 'Procedimento' && e.priceParticular) ? `<span style="color:var(--active);font-size:11px;font-weight:700;">R$ ${e.priceParticular}</span>` : '';
-            const pcStr = (e.nature !== 'Procedimento' && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;">Cartão: R$ ${e.priceCartao}</span>` : '';
-            return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s1);border-radius:4px;margin-bottom:4px;">
-                ${natureBadge}
-                <span style="flex:1;font-size:11px;font-weight:600;">${e.label}</span>
-                ${ppStr}${pcStr}
-                <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;" onclick="removeDocEntry(${i})">✕</button>
-            </div>`;
-        }).join('');
-    }, 100);
+    setTimeout(() => renderDocEntriesList(), 30);
 }
 
 function saveDoctorEdit(id) {
-    const cleanName = document.getElementById(`edit-d-name-${id}`).value;
-    const spec = document.getElementById(`edit-d-spec-${id}`).value;
-    const row = document.getElementById(`row-d-${id}`);
+    const cleanName = document.getElementById(`edit-d-name-${id}`)?.value.trim();
+    if (!cleanName) { showToast('INFORME O NOME DO PROFISSIONAL'); return; }
+    if (_pendingDocEntries.length === 0) { showToast('ADICIONE AO MENOS UMA ESPECIALIDADE'); return; }
+
+    const d = S.doctors.find(x => x.id === id);
+    if (!d) return;
 
     const prefixBtn = document.querySelector(`#edit-tglPrefix-${id} .active`);
     const prefix = prefixBtn ? prefixBtn.getAttribute('data-val') : 'Dr.';
-
     const typeBtn = document.querySelector(`#edit-tglType-${id} .active`);
     const type = typeBtn ? typeBtn.getAttribute('data-val') : 'hora';
-
     const defNatureBtn = document.querySelector(`#edit-tglDefNature-${id} .active`);
     const defaultNature = defNatureBtn ? defNatureBtn.getAttribute('data-val') : '';
-
+    const row = document.getElementById(`row-d-${id}`);
     const checkedConvenios = row ? [...row.querySelectorAll('input[data-conv-id]:checked')].map(i => i.getAttribute('data-conv-id')) : [];
     const checkedProcs = row ? [...row.querySelectorAll('input[data-proc-id]:checked')].map(i => i.getAttribute('data-proc-id')) : [];
 
-    const d = S.doctors.find(x => x.id === id);
-    if(cleanName && d) {
-        d.name = prefix + ' ' + cleanName;
-        d.spec = spec;
-        d.type = type;
-        d.defaultNature = defaultNature || null;
-        d.convenios = checkedConvenios;
-        d.procedimentos = checkedProcs;
-        // Replace all priceEntries for this doc+unit with the edited list
-        if (!S.priceEntries) S.priceEntries = [];
-        S.priceEntries = S.priceEntries.filter(e => !(e.doctorId === id && e.unitId === S.currentUnit));
-        // Add main entry from profile price fields if not already covered by pending entries
-        const mainPP = document.getElementById('edit-price-particular-' + id)?.value.trim();
-        const mainPC = document.getElementById('edit-price-cartao-' + id)?.value.trim();
-        if (defaultNature && defaultNature !== 'Procedimento' && (mainPP || mainPC)) {
-            const mainLabel = spec || d.spec || 'Consulta';
-            const alreadyInPending = _pendingDocEntries.some(e => e.label === mainLabel && e.nature === defaultNature);
-            if (!alreadyInPending) {
-                S.priceEntries.push({ id: 'pe_main_' + id, doctorId: id, unitId: S.currentUnit, label: mainLabel, nature: defaultNature, priceParticular: mainPP || null, priceCartao: mainPC || null });
-            }
-        }
-        _pendingDocEntries.forEach(e => {
-            S.priceEntries.push({...e, doctorId: id, unitId: S.currentUnit});
-        });
-        // Backward compat: update profile prices from first consultation entry
-        const _firstConsulta = (mainPP || mainPC)
-            ? { priceParticular: mainPP, priceCartao: mainPC }
-            : _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
-        d.priceParticular = _firstConsulta?.priceParticular || null;
-        d.priceCartao = _firstConsulta?.priceCartao || null;
-        saveConfig();
-        renderCfgBody('medicos');
-        showToast('MÉDICO ATUALIZADO COM SUCESSO!');
-    }
+    d.name = prefix + ' ' + cleanName;
+    d.spec = _pendingDocEntries[0]?.label || d.spec;
+    d.type = type;
+    d.defaultNature = defaultNature || null;
+    d.convenios = checkedConvenios;
+    d.procedimentos = checkedProcs;
+
+    if (!S.priceEntries) S.priceEntries = [];
+    S.priceEntries = S.priceEntries.filter(e => !(e.doctorId === id && e.unitId === S.currentUnit));
+    _pendingDocEntries.forEach(e => {
+        S.priceEntries.push({...e, doctorId: id, unitId: S.currentUnit});
+    });
+
+    const firstConsulta = _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
+    d.priceParticular = firstConsulta?.priceParticular || null;
+    d.priceCartao = firstConsulta?.priceCartao || null;
+
+    _pendingDocEntries = [];
+    _docEntryListId = 'doc-entries-list';
+    saveConfig();
+    renderCfgBody('medicos');
+    showToast('MÉDICO ATUALIZADO COM SUCESSO!');
 }
 
 // OPERAÇÕES BÁSICAS
@@ -1956,36 +1962,36 @@ function unarchiveRoom(id) {
     }
 }
 
-function addDoctor(){
-    const name=document.getElementById('newDocName').value; if(!name)return;
-    const spec=document.getElementById('newDocSpec').value || 'Geral';
-    const doc = {id:'d'+Date.now(), name: curTgl.tglPrefix+' '+name, spec, type: curTgl.tglType, unitId: S.currentUnit};
-    if (curTgl.tglDefaultNature) doc.defaultNature = curTgl.tglDefaultNature;
-    // Sync specialty entries to priceEntries
+function addDoctor() {
+    const name = document.getElementById('newDocName')?.value.trim();
+    if (!name) { showToast('INFORME O NOME DO PROFISSIONAL'); return; }
+    if (_pendingDocEntries.length === 0) { showToast('ADICIONE AO MENOS UMA ESPECIALIDADE'); return; }
+
+    const prefixBtn = document.querySelector('#tglPrefix .active');
+    const prefix = prefixBtn ? prefixBtn.getAttribute('data-val') : 'Dr.';
+    const typeBtn = document.querySelector('#tglType .active');
+    const type = typeBtn ? typeBtn.getAttribute('data-val') : 'hora';
+    const defNatureBtn = document.querySelector('#tglDefaultNature .active');
+    const defaultNature = defNatureBtn ? defNatureBtn.getAttribute('data-val') : '';
+
+    const spec = _pendingDocEntries[0]?.label || 'Geral';
+    const doc = { id: 'd' + Date.now(), name: prefix + ' ' + name, spec, type, unitId: S.currentUnit };
+    if (defaultNature) doc.defaultNature = defaultNature;
+
     if (!S.priceEntries) S.priceEntries = [];
-    // Add main entry from profile price fields if not already covered by pending entries
-    const _mainPP = document.getElementById('newDocPriceParticular')?.value.trim();
-    const _mainPC = document.getElementById('newDocPriceCartao')?.value.trim();
-    if (curTgl.tglDefaultNature && curTgl.tglDefaultNature !== 'Procedimento' && (_mainPP || _mainPC)) {
-        const _mainLabel = spec || 'Consulta';
-        const _alreadyInPending = _pendingDocEntries.some(e => e.label === _mainLabel && e.nature === curTgl.tglDefaultNature);
-        if (!_alreadyInPending) {
-            S.priceEntries.push({ id: 'pe_main_' + doc.id, doctorId: doc.id, unitId: S.currentUnit, label: _mainLabel, nature: curTgl.tglDefaultNature, priceParticular: _mainPP || null, priceCartao: _mainPC || null });
-        }
-    }
     _pendingDocEntries.forEach(e => {
         S.priceEntries.push({...e, doctorId: doc.id, unitId: S.currentUnit});
     });
-    // Backward compat: also set profile prices from first consultation entry
-    const firstConsulta = (_mainPP || _mainPC)
-        ? { priceParticular: _mainPP, priceCartao: _mainPC }
-        : _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
+
+    const firstConsulta = _pendingDocEntries.find(e => !e.nature || e.nature === 'Consulta' || e.nature === 'Consulta/Sessão');
     if (firstConsulta?.priceParticular) doc.priceParticular = firstConsulta.priceParticular;
     if (firstConsulta?.priceCartao) doc.priceCartao = firstConsulta.priceCartao;
+
     S.doctors.push(doc);
     _pendingDocEntries = [];
-    curTgl.tglDefaultNature = '';
-    saveConfig(); renderCfgBody('medicos'); showToast("MÉDICO CADASTRADO NA UNIDADE ATUAL.");
+    saveConfig();
+    renderCfgBody('medicos');
+    showToast('MÉDICO CADASTRADO COM SUCESSO!');
 }
 function deleteDoctor(id){ if(!confirm("EXCLUIR MÉDICO?")) return; S.doctors=S.doctors.filter(d=>d.id!==id); saveConfig(); renderCfgBody('medicos'); }
 
