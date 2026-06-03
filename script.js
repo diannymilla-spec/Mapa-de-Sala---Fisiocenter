@@ -1015,6 +1015,7 @@ function openAlloc(key) {
   });
 
   sel.innerHTML = `<option value="">Médico...</option>` + sortedDocs.map(d => `<option value="${d.id}" ${slot?.doctorId === d.id ? 'selected' : ''}>${d.name}</option>`).join('');
+  populateAllocSpecs(slot?.doctorId || '', slot?.entryId || null);
 
   const diasuSKey = `${parts0[0]}|diasuS|${date0}|dia`;
   document.getElementById('btnDelAlloc').style.display = (slot || !!S.slots[diasuSKey]) ? 'block' : 'none';
@@ -1030,6 +1031,46 @@ function openAlloc(key) {
 }
 
 function closeAlloc() { document.getElementById('allocModal').classList.remove('open'); }
+
+function populateAllocSpecs(docId, currentEntryId) {
+    const grp = document.getElementById('allocSpecGroup');
+    const sel = document.getElementById('allocSpecId');
+    if (!grp || !sel) return;
+    if (!docId) { grp.style.display = 'none'; sel.innerHTML = ''; return; }
+    const entries = (S.priceEntries || []).filter(e => e.doctorId === docId && e.unitId === S.currentUnit);
+    if (entries.length === 0) { grp.style.display = 'none'; sel.innerHTML = ''; return; }
+    grp.style.display = '';
+    sel.innerHTML = '<option value="">Selecione a especialidade...</option>' +
+        entries.map(e => {
+            const lbl = e.serviceLabel || e.label;
+            const nat = e.nature ? ` (${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature})` : '';
+            return `<option value="${e.id}" ${currentEntryId === e.id ? 'selected' : ''}>${lbl}${nat}</option>`;
+        }).join('');
+    if (entries.length === 1 && !currentEntryId) sel.value = entries[0].id;
+    onAllocSpecChange();
+}
+
+function onAllocDocChange() {
+    const docId = document.getElementById('allocDocId')?.value;
+    populateAllocSpecs(docId, null);
+    if (docId) {
+        const doc = S.doctors.find(d => d.id === docId);
+        if (doc?.defaultNature) {
+            const btn = document.querySelector(`#tglAllocNature .tgl-btn[onclick*="'${doc.defaultNature}'"]`);
+            if (btn) setTgl('tglAllocNature', btn, doc.defaultNature);
+        }
+    }
+}
+
+function onAllocSpecChange() {
+    const entryId = document.getElementById('allocSpecId')?.value;
+    if (!entryId) return;
+    const entry = (S.priceEntries || []).find(e => e.id === entryId);
+    if (entry?.nature) {
+        const btn = document.querySelector(`#tglAllocNature .tgl-btn[onclick*="'${entry.nature}'"]`);
+        if (btn) setTgl('tglAllocNature', btn, entry.nature);
+    }
+}
 
 // BUSCA DE MÉDICO
 let searchSelectedDocId = null;
@@ -1271,6 +1312,9 @@ function saveAllocation() {
 
   const noDocNeeded = status === 'feriado' || status === 'manutencao' || status === 'diasuS';
   if(!docId && !noDocNeeded) { showToast("SELECIONE UM MÉDICO!"); return; }
+  const allocSpecId = document.getElementById('allocSpecId')?.value || null;
+  const specVisible = document.getElementById('allocSpecGroup')?.style.display !== 'none';
+  if (!noDocNeeded && specVisible && !allocSpecId) { showToast("SELECIONE A ESPECIALIDADE!"); return; }
 
   const unit  = S.units.find(u => u.id === S.currentUnit);
   const parts = key.split('|');
@@ -1309,7 +1353,7 @@ function saveAllocation() {
       showToast("DIA MARCADO COMO DIA DE SUS");
   } else {
       const apply = (k) => {
-          S.slots[k] = { doctorId: docId, status, nature, obs };
+          S.slots[k] = { doctorId: docId, status, nature, obs, entryId: allocSpecId || null };
           toSave[k] = S.slots[k];
       };
       apply(key);

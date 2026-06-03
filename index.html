@@ -88,7 +88,12 @@
 
     <div class="form-group">
       <label class="form-label">Médico</label>
-      <select class="sel" id="allocDocId"></select>
+      <select class="sel" id="allocDocId" onchange="onAllocDocChange()"></select>
+    </div>
+
+    <div class="form-group" id="allocSpecGroup" style="display:none;">
+      <label class="form-label">Especialidade</label>
+      <select class="sel" id="allocSpecId" onchange="onAllocSpecChange()"></select>
     </div>
 
     <div class="form-group">
