@@ -72,6 +72,8 @@ let curTgl = {
 
 let _pendingDocEntries = [];
 let _docEntryListId = 'doc-entries-list';
+let _activeEditDocId = null;
+let _editingEntryIdx = -1;
 
 // ── FORÇAR TEXTOS (MAIÚSCULAS/TITLE CASE) ──
 document.addEventListener('input', function(e) {
@@ -1487,6 +1489,8 @@ function renderCfgBody(tab) {
         const archivedDocs = S.doctors.filter(d => d.unitId === S.currentUnit && d.archived).sort(sortByName);
         _pendingDocEntries = [];
         _docEntryListId = 'doc-entries-list';
+        _activeEditDocId = null;
+        _editingEntryIdx = -1;
         body.innerHTML = `
             <div id="docAddForm" style="background:var(--s2);padding:16px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
                 <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">
@@ -1555,7 +1559,7 @@ function renderCfgBody(tab) {
                 <!-- Linha 4: ações da entrada -->
                 <div style="display:flex;gap:8px;margin-bottom:10px;">
                     <button class="btn btn-ghost" style="flex:1;" onclick="cancelDocEntry()">✕ Limpar</button>
-                    <button class="btn btn-primary" style="flex:1;" onclick="confirmAddDocEntry()">+ Adicionar Especialidade</button>
+                    <button id="doc-ent-add-btn" class="btn btn-primary" style="flex:1;" onclick="confirmAddDocEntry()">+ Adicionar Especialidade</button>
                 </div>
 
                 <!-- Linha 5: lista de especialidades -->
@@ -1704,27 +1708,57 @@ function renderDocEntriesList() {
         el.innerHTML = '<div style="font-size:10px;color:var(--t3);font-style:italic;padding:4px 0;">Nenhuma especialidade adicionada.</div>';
         return;
     }
+    const docDefault = _activeEditDocId ? S.doctors.find(x => x.id === _activeEditDocId)?.defaultNature : null;
     el.innerHTML = _pendingDocEntries.map((e, i) => {
-        const natureBadge = e.nature
-            ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${e.nature === 'Consulta/Sessão' ? 'C/Sessão' : e.nature}</span>`
+        const displayNature = e.nature || docDefault || null;
+        const natureBadge = displayNature
+            ? `<span style="font-size:7px;font-weight:900;text-transform:uppercase;color:var(--accent);background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.25);border-radius:3px;padding:1px 5px;flex-shrink:0;">${displayNature === 'Consulta/Sessão' ? 'C/Sessão' : displayNature}</span>`
             : '';
-        const ppStr = (e.nature !== 'Procedimento' && e.priceParticular) ? `<span style="color:var(--active);font-size:11px;font-weight:700;">R$ ${e.priceParticular}</span>` : '';
-        const pcStr = (e.nature !== 'Procedimento' && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;font-weight:600;">Cartão: R$ ${e.priceCartao}</span>` : '';
-        return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s1);border-radius:4px;margin-bottom:4px;">
+        const isProc = displayNature === 'Procedimento';
+        const ppStr = (!isProc && e.priceParticular) ? `<span style="color:var(--active);font-size:11px;font-weight:700;">R$ ${e.priceParticular}</span>` : '';
+        const pcStr = (!isProc && e.priceCartao) ? `<span style="color:var(--accent);font-size:10px;font-weight:600;">Cartão: R$ ${e.priceCartao}</span>` : '';
+        const isEditing = _editingEntryIdx === i;
+        const rowStyle = isEditing
+            ? 'display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(79,142,247,0.12);border:1px solid var(--accent);border-radius:4px;margin-bottom:4px;'
+            : 'display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--s1);border-radius:4px;margin-bottom:4px;';
+        return `<div style="${rowStyle}">
             ${natureBadge}
             <span style="flex:1;font-size:11px;font-weight:600;">${e.label}</span>
             <span style="display:flex;gap:8px;align-items:center;">${ppStr}${pcStr}</span>
+            <button class="btn btn-edit" style="padding:3px 7px;font-size:10px;flex-shrink:0;" onclick="editDocEntry(${i})" title="Editar">✎</button>
             <button class="btn btn-danger" style="padding:3px 7px;font-size:10px;flex-shrink:0;" onclick="removeDocEntry(${i})">✕</button>
         </div>`;
     }).join('');
 }
 
 function removeDocEntry(idx) {
+    if (_editingEntryIdx === idx) { _editingEntryIdx = -1; cancelDocEntry(); }
     _pendingDocEntries.splice(idx, 1);
+    if (_editingEntryIdx > idx) _editingEntryIdx--;
     renderDocEntriesList();
 }
 
+function editDocEntry(i) {
+    const e = _pendingDocEntries[i];
+    if (!e) return;
+    _editingEntryIdx = i;
+    const l = document.getElementById('doc-ent-label');
+    const n = document.getElementById('doc-ent-nature');
+    const pp = document.getElementById('doc-ent-pp');
+    const pc = document.getElementById('doc-ent-pc');
+    if (l) { l.value = e.label || ''; }
+    if (n) n.value = e.nature || '';
+    if (pp) pp.value = e.priceParticular || '';
+    if (pc) pc.value = e.priceCartao || '';
+    docEntNatureChange();
+    const btn = document.getElementById('doc-ent-add-btn');
+    if (btn) btn.textContent = '✓ Atualizar Especialidade';
+    renderDocEntriesList();
+    if (l) l.focus();
+}
+
 function cancelDocEntry() {
+    _editingEntryIdx = -1;
     const l = document.getElementById('doc-ent-label');
     const n = document.getElementById('doc-ent-nature');
     const pp = document.getElementById('doc-ent-pp');
@@ -1735,6 +1769,9 @@ function cancelDocEntry() {
     if (pc) pc.value = '';
     const pricesEl = document.getElementById('doc-ent-prices');
     if (pricesEl) pricesEl.style.display = 'flex';
+    const btn = document.getElementById('doc-ent-add-btn');
+    if (btn) btn.textContent = '+ Adicionar Especialidade';
+    renderDocEntriesList();
 }
 
 function confirmAddDocEntry() {
@@ -1748,8 +1785,15 @@ function confirmAddDocEntry() {
         showToast('INFORME AO MENOS UM VALOR (Particular ou Cartão)');
         return;
     }
-    _pendingDocEntries.push({ id: 'pe_' + Date.now(), label, nature: nature || null, priceParticular: pp || null, priceCartao: pc || null });
-    renderDocEntriesList();
+    const entry = {
+        id: _editingEntryIdx >= 0 ? _pendingDocEntries[_editingEntryIdx].id : 'pe_' + Date.now(),
+        label, nature: nature || null, priceParticular: pp || null, priceCartao: pc || null
+    };
+    if (_editingEntryIdx >= 0) {
+        _pendingDocEntries[_editingEntryIdx] = entry;
+    } else {
+        _pendingDocEntries.push(entry);
+    }
     cancelDocEntry();
 }
 
@@ -1764,6 +1808,8 @@ function editDoctor(id) {
     if (addForm) addForm.style.display = 'none';
 
     _docEntryListId = 'doc-entries-list-' + id;
+    _activeEditDocId = id;
+    _editingEntryIdx = -1;
     _pendingDocEntries = (S.priceEntries || []).filter(e => e.doctorId === id && e.unitId === S.currentUnit).map(e => ({...e}));
 
     const prefix = d.name.startsWith('Dra.') ? 'Dra.' : 'Dr.';
