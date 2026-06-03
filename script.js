@@ -1569,7 +1569,9 @@ function renderCfgBody(tab) {
                 <button class="btn btn-primary" style="width:100%;padding:10px;font-size:13px;" onclick="addDoctor()">✓ Cadastrar Médico</button>
             </div>
 
-            <div>${activeDocs.map(d => `
+            <div>${activeDocs.map(d => {
+                const hasSlots = Object.values(S.slots || {}).some(s => s.doctorId === d.id);
+                return `
                 <div class="cfg-row" id="row-d-${d.id}">
                     <div style="display:flex; flex-direction:column">
                         <strong>${d.name}</strong>
@@ -1578,9 +1580,10 @@ function renderCfgBody(tab) {
                     <div class="cfg-row-actions">
                         <button class="btn btn-edit" onclick="editDoctor('${d.id}')">✎</button>
                         <button class="btn btn-archive" onclick="archiveDoctor('${d.id}')" title="Arquivar profissional">⊘</button>
-                        <button class="btn btn-danger" style="padding:5px 10px" onclick="deleteDoctor('${d.id}')">✕</button>
+                        ${hasSlots ? '' : `<button class="btn btn-danger" style="padding:5px 10px" onclick="deleteDoctor('${d.id}')">✕</button>`}
                     </div>
-                </div>`).join('')}
+                </div>`;
+            }).join('')}
             </div>
 
             ${archivedDocs.length > 0 ? `
