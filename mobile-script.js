@@ -573,6 +573,7 @@ function showMobileSlotDetail(key) {
                   <div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Atendimento</div>
                   <div style="font-weight:700;">${typeTxt}</div>
                 </div>
+                ${(() => { const att = doc.attendantId ? (S.attendants||[]).find(a=>a.id===doc.attendantId) : null; return att ? `<div style="background:var(--s3);border-radius:8px;padding:10px;grid-column:span 2;"><div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);margin-bottom:4px;">Atendente</div><div style="font-weight:700;">${att.name}</div></div>` : ''; })()}
                 ${slot.status === 'canceled' ? `
                 <div style="background:rgba(224,92,92,0.1);border:1px solid rgba(224,92,92,0.3);border-radius:8px;padding:10px;grid-column:span 2;">
                   <div style="font-size:10px;font-weight:800;color:var(--cancel);">⛔ CANCELADO</div>

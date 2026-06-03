@@ -12,7 +12,7 @@ let S = {
     {id:'u2', name:'FISIOTERAPIA', rooms: Array.from({length:7}, (_,i) => ({id:'rf'+(i+1), name: `SALA ${i+1}`}))},
     {id:'u3', name:'ABAETETUBA', rooms: []}
   ],
-  doctors: [], slots: {}, priceEntries: [], currentUnit: 'u1', view: 'week',
+  doctors: [], attendants: [], slots: {}, priceEntries: [], currentUnit: 'u1', view: 'week',
   weekAnchor: null, monthYear: new Date().getFullYear(), monthMonth: new Date().getMonth()
 };
 
@@ -111,6 +111,7 @@ async function saveConfig() {
     const { error } = await _supabase.from('mapa_config').upsert([
         { id: 'units',        data: S.units },
         { id: 'doctors',      data: S.doctors },
+        { id: 'attendants',   data: S.attendants || [] },
         { id: 'priceEntries', data: S.priceEntries || [] }
     ]);
     if (error) { console.error('saveConfig:', error); showToast('ERRO AO SALVAR CONFIGURAÇÃO'); }
@@ -543,9 +544,11 @@ async function init() {
         if (!cfgErr && configRows && configRows.length > 0) {
             const unitsRow        = configRows.find(r => r.id === 'units');
             const doctorsRow      = configRows.find(r => r.id === 'doctors');
+            const attendantsRow   = configRows.find(r => r.id === 'attendants');
             const priceEntriesRow = configRows.find(r => r.id === 'priceEntries');
             if (unitsRow?.data)        S.units        = unitsRow.data;
             if (doctorsRow?.data)      S.doctors      = doctorsRow.data;
+            if (attendantsRow?.data)   S.attendants   = attendantsRow.data;
             if (priceEntriesRow?.data) S.priceEntries = priceEntriesRow.data;
             deduplicatePriceEntries();
         }
@@ -784,7 +787,8 @@ function slotHTML(slot, key, isMonthView) {
   }
 
   const typeDisplay = typeTxt === 'hora' ? 'Hora Marcada' : 'Ordem de Chegada';
-  let tooltip = `${doc.name}\nEspecialidade: ${doc.spec}\nNatureza: ${natureTxt}\nAtendimento: ${typeDisplay}`;
+  const attendant = doc.attendantId ? (S.attendants || []).find(a => a.id === doc.attendantId) : null;
+  let tooltip = `${doc.name}\nEspecialidade: ${doc.spec}\nNatureza: ${natureTxt}\nAtendimento: ${typeDisplay}${attendant ? '\nAtendente: ' + attendant.name : ''}`;
 
   // Preços: prioriza entradas da Tabela de Preços filtradas pela natureza do slot
   const _peEntries = (S.priceEntries || []).filter(e =>
@@ -1100,7 +1104,11 @@ function filterDoctors(query) {
     }
 
     const filtered = q
-        ? unitDocs.filter(d => d.name.toLowerCase().includes(q) || (d.spec || '').toLowerCase().includes(q))
+        ? unitDocs.filter(d => {
+            if (d.name.toLowerCase().includes(q) || (d.spec || '').toLowerCase().includes(q)) return true;
+            const att = d.attendantId ? (S.attendants || []).find(a => a.id === d.attendantId) : null;
+            return att && att.name.toLowerCase().includes(q);
+          })
         : (searchSelectedDocId ? unitDocs.filter(d => d.id === searchSelectedDocId) : []);
 
     const sorted = [...filtered].sort((a, b) => {
@@ -1126,6 +1134,7 @@ function filterDoctors(query) {
         <div class="search-doc-item${sel ? ' selected' : ''}" onclick="selectDoctor('${doc.id}')">
             <div style="font-weight:700;font-size:12px;color:var(--text);">${doc.name}</div>
             <div style="font-size:10px;color:var(--t2);margin-top:2px;">${doc.spec || ''}</div>
+            ${(() => { const att = doc.attendantId ? (S.attendants||[]).find(a=>a.id===doc.attendantId) : null; return att ? `<div style="font-size:9px;color:var(--accent);margin-top:1px;">Atendente: ${att.name}</div>` : ''; })()}
         </div>`;
     });
     html += `</div>`;
@@ -1570,6 +1579,16 @@ function renderCfgBody(tab) {
                     </div>
                 </div>
 
+                <!-- Atendente Responsável -->
+                ${(S.attendants || []).filter(a => a.unitId === S.currentUnit).length > 0 ? `
+                <div style="margin-top:4px;">
+                    <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:4px;">Atendente Responsável <span style="font-weight:400;text-transform:none;font-style:italic;">(opcional)</span></label>
+                    <select class="sel" id="newDocAttendantId" style="padding:6px 8px;font-size:11px;width:100%;">
+                        <option value="">Nenhum</option>
+                        ${(S.attendants || []).filter(a => a.unitId === S.currentUnit).map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+                    </select>
+                </div>` : ''}
+
                 <div style="border-top:1px solid var(--border);margin:12px 0;"></div>
 
                 <!-- Linha 3: Especialidade + valores lado a lado -->
@@ -1644,6 +1663,32 @@ function renderCfgBody(tab) {
             </div>` : ''}
         `;
         setTimeout(() => { const inp = document.getElementById('newDocName'); if (inp) inp.focus(); }, 30);
+    } else if(tab === 'atendentes') {
+        if (!S.attendants) S.attendants = [];
+        const atts = S.attendants.filter(a => a.unitId === S.currentUnit);
+        body.innerHTML = `
+            <div style="background:var(--s2);padding:16px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
+                <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">
+                    Novo Atendente — <span style="color:var(--accent);">${unit.name}</span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" class="inp" id="newAttendantName" placeholder="Nome do Atendente" style="flex:1;">
+                    <button class="btn btn-primary" style="white-space:nowrap;" onclick="addAttendant()">+ Cadastrar</button>
+                </div>
+            </div>
+            <div>${atts.map(a => `
+                <div class="cfg-row" id="row-att-${a.id}">
+                    <div style="display:flex;flex-direction:column;">
+                        <strong>${a.name}</strong>
+                        <small style="color:var(--t3);">${S.doctors.filter(d => d.unitId === S.currentUnit && d.attendantId === a.id).map(d => d.name).join(', ') || 'Nenhum profissional'}</small>
+                    </div>
+                    <div class="cfg-row-actions">
+                        <button class="btn btn-edit" onclick="editAttendant('${a.id}')">✎</button>
+                        <button class="btn btn-danger" style="padding:5px 10px;" onclick="deleteAttendant('${a.id}')">✕</button>
+                    </div>
+                </div>`).join('')}
+            </div>`;
+        setTimeout(() => { const inp = document.getElementById('newAttendantName'); if (inp) inp.focus(); }, 30);
     } else {
         const activeRooms   = unit.rooms.filter(r => !r.archived && !r.archivedFrom);
         const archivedRooms = unit.rooms.filter(r => r.archived || r.archivedFrom);
@@ -1906,6 +1951,16 @@ function editDoctor(id) {
                 </div>
             </div>
 
+            <!-- Atendente Responsável -->
+            ${(S.attendants || []).filter(a => a.unitId === S.currentUnit).length > 0 ? `
+            <div style="margin-top:4px;">
+                <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:4px;">Atendente Responsável <span style="font-weight:400;text-transform:none;font-style:italic;">(opcional)</span></label>
+                <select class="sel" id="edit-d-attendant-${id}" style="padding:6px 8px;font-size:11px;width:100%;">
+                    <option value="">Nenhum</option>
+                    ${(S.attendants || []).filter(a => a.unitId === S.currentUnit).map(a => `<option value="${a.id}" ${d.attendantId === a.id ? 'selected' : ''}>${a.name}</option>`).join('')}
+                </select>
+            </div>` : ''}
+
             <div style="border-top:1px solid var(--border);margin:12px 0;"></div>
 
             <!-- Linha 3: Especialidade + valores -->
@@ -1971,6 +2026,7 @@ function saveDoctorEdit(id) {
     d.spec = _pendingDocEntries[0]?.label || d.spec;
     d.type = type;
     d.defaultNature = defaultNature || null;
+    d.attendantId = document.getElementById(`edit-d-attendant-${id}`)?.value || null;
     d.convenios = checkedConvenios;
     d.procedimentos = checkedProcs;
 
@@ -2046,8 +2102,10 @@ function addDoctor() {
     const defaultNature = defNatureBtn ? defNatureBtn.getAttribute('data-val') : '';
 
     const spec = _pendingDocEntries[0]?.label || 'Geral';
+    const attendantId = document.getElementById('newDocAttendantId')?.value || null;
     const doc = { id: 'd' + Date.now(), name: prefix + ' ' + name, spec, type, unitId: S.currentUnit };
     if (defaultNature) doc.defaultNature = defaultNature;
+    if (attendantId) doc.attendantId = attendantId;
 
     if (!S.priceEntries) S.priceEntries = [];
     _pendingDocEntries.forEach(e => {
@@ -2073,6 +2131,35 @@ function archiveDoctor(id) {
 function unarchiveDoctor(id) {
     const d = S.doctors.find(x => x.id === id);
     if(d) { d.archived = false; saveConfig(); renderCfgBody('medicos'); showToast("PROFISSIONAL REATIVADO"); }
+}
+
+// ── ATENDENTES ──────────────────────────────────────────────
+function addAttendant() {
+    const name = document.getElementById('newAttendantName')?.value.trim();
+    if (!name) { showToast('INFORME O NOME DO ATENDENTE'); return; }
+    if (!S.attendants) S.attendants = [];
+    S.attendants.push({ id: 'att_' + Date.now(), name, unitId: S.currentUnit });
+    saveConfig(); renderCfgBody('atendentes'); showToast('ATENDENTE CADASTRADO!');
+}
+function editAttendant(id) {
+    const a = (S.attendants || []).find(x => x.id === id);
+    const row = document.getElementById('row-att-' + id);
+    if (!a || !row) return;
+    row.innerHTML = `
+        <input class="inp" type="text" id="edit-att-${id}" value="${a.name}" style="flex:1;margin-right:5px;">
+        <button class="btn btn-primary" style="padding:5px 10px;" onclick="saveAttendantEdit('${id}')">✓</button>
+        <button class="btn btn-ghost" style="padding:5px 10px;" onclick="renderCfgBody('atendentes')">✕</button>`;
+}
+function saveAttendantEdit(id) {
+    const a = (S.attendants || []).find(x => x.id === id);
+    const val = document.getElementById('edit-att-' + id)?.value.trim();
+    if (val && a) { a.name = val; saveConfig(); renderCfgBody('atendentes'); }
+}
+function deleteAttendant(id) {
+    if (!confirm('EXCLUIR ATENDENTE?')) return;
+    S.attendants = (S.attendants || []).filter(x => x.id !== id);
+    S.doctors.forEach(d => { if (d.attendantId === id) d.attendantId = null; });
+    saveConfig(); renderCfgBody('atendentes'); showToast('ATENDENTE REMOVIDO');
 }
 
 function renderUnitSelect() {
@@ -2106,6 +2193,7 @@ function changeUnit(id) {
         const activeTabId = document.querySelector('.cfg-tab.active').id;
         if (activeTabId === 'tabSalas') renderCfgBody('salas');
         else if (activeTabId === 'tabMedicos') renderCfgBody('medicos');
+        else if (activeTabId === 'tabAtendentes') renderCfgBody('atendentes');
     }
     saveLocal();
 }
