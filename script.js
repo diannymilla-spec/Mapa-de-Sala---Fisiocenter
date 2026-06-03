@@ -1535,15 +1535,6 @@ function renderCfgBody(tab) {
                         <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Especialidade</label>
                         <input type="text" class="inp" id="doc-ent-label" placeholder="Ex: Ginecologia" style="padding:6px 8px;" maxlength="60">
                     </div>
-                    <div style="flex-shrink:0;">
-                        <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Natureza</label>
-                        <select id="doc-ent-nature" class="sel" onchange="docEntNatureChange()" style="padding:6px 8px;font-size:11px;">
-                            <option value="">Todos</option>
-                            <option value="Consulta">Consulta</option>
-                            <option value="Consulta/Sessão">C/Sessão</option>
-                            <option value="Procedimento">Procedimento</option>
-                        </select>
-                    </div>
                     <div id="doc-ent-prices" style="display:flex;gap:8px;flex:2;min-width:160px;">
                         <div style="flex:1;">
                             <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Particular R$</label>
@@ -1695,10 +1686,13 @@ function setEditTglWithPrices(gid, btn, priceGroupId) {
 }
 
 // ── Gestão de entradas de especialidade no formulário de médico ──
-function docEntNatureChange() {
-    const val = document.getElementById('doc-ent-nature')?.value;
-    const el = document.getElementById('doc-ent-prices');
-    if (el) el.style.display = val === 'Procedimento' ? 'none' : 'flex';
+function _getDefaultNatureFromToggle() {
+    if (_activeEditDocId) {
+        const btn = document.querySelector(`#edit-tglDefNature-${_activeEditDocId} .active`);
+        return btn ? btn.getAttribute('data-val') : '';
+    }
+    const btn = document.querySelector('#tglDefaultNature .active');
+    return btn ? btn.getAttribute('data-val') : '';
 }
 
 function renderDocEntriesList() {
@@ -1743,14 +1737,11 @@ function editDocEntry(i) {
     if (!e) return;
     _editingEntryIdx = i;
     const l = document.getElementById('doc-ent-label');
-    const n = document.getElementById('doc-ent-nature');
     const pp = document.getElementById('doc-ent-pp');
     const pc = document.getElementById('doc-ent-pc');
     if (l) { l.value = e.label || ''; }
-    if (n) n.value = e.nature || '';
     if (pp) pp.value = e.priceParticular || '';
     if (pc) pc.value = e.priceCartao || '';
-    docEntNatureChange();
     const btn = document.getElementById('doc-ent-add-btn');
     if (btn) btn.textContent = '✓ Atualizar Especialidade';
     renderDocEntriesList();
@@ -1760,15 +1751,11 @@ function editDocEntry(i) {
 function cancelDocEntry() {
     _editingEntryIdx = -1;
     const l = document.getElementById('doc-ent-label');
-    const n = document.getElementById('doc-ent-nature');
     const pp = document.getElementById('doc-ent-pp');
     const pc = document.getElementById('doc-ent-pc');
     if (l) { l.value = ''; l.focus(); }
-    if (n) n.value = '';
     if (pp) pp.value = '';
     if (pc) pc.value = '';
-    const pricesEl = document.getElementById('doc-ent-prices');
-    if (pricesEl) pricesEl.style.display = 'flex';
     const btn = document.getElementById('doc-ent-add-btn');
     if (btn) btn.textContent = '+ Adicionar Especialidade';
     renderDocEntriesList();
@@ -1778,7 +1765,7 @@ function confirmAddDocEntry() {
     const label = document.getElementById('doc-ent-label')?.value.trim();
     if (!label) { showToast('INFORME A ESPECIALIDADE'); return; }
     if (label.length > 60) { showToast('ESPECIALIDADE MUITO LONGA (máx 60 chars)'); return; }
-    const nature = document.getElementById('doc-ent-nature')?.value || null;
+    const nature = _getDefaultNatureFromToggle() || null;
     const pp = nature !== 'Procedimento' ? document.getElementById('doc-ent-pp')?.value.trim() : '';
     const pc = nature !== 'Procedimento' ? document.getElementById('doc-ent-pc')?.value.trim() : '';
     if (nature && nature !== 'Procedimento' && !pp && !pc) {
@@ -1883,15 +1870,6 @@ function editDoctor(id) {
                 <div style="flex:2;min-width:130px;">
                     <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Especialidade</label>
                     <input type="text" class="inp" id="doc-ent-label" placeholder="Ex: Ginecologia" style="padding:6px 8px;" maxlength="60">
-                </div>
-                <div style="flex-shrink:0;">
-                    <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Natureza</label>
-                    <select id="doc-ent-nature" class="sel" onchange="docEntNatureChange()" style="padding:6px 8px;font-size:11px;">
-                        <option value="">Todos</option>
-                        <option value="Consulta">Consulta</option>
-                        <option value="Consulta/Sessão">C/Sessão</option>
-                        <option value="Procedimento">Procedimento</option>
-                    </select>
                 </div>
                 <div id="doc-ent-prices" style="display:flex;gap:8px;flex:2;min-width:160px;">
                     <div style="flex:1;">
