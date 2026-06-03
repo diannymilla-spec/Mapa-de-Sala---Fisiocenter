@@ -371,7 +371,7 @@ function addPriceEntry(doctorId) {
   const defLabel  = isFirst && d ? (d.spec || '') : '';
   const defPP     = isFirst && d ? (d.priceParticular || '') : '';
   const defPC     = isFirst && d ? (d.priceCartao     || '') : '';
-  const defNature = (isFirst && d?.defNature) ? d.defNature : '';
+  const defNature = (d && d.defaultNature) ? d.defaultNature : '';
 
   const _natureSel = (val) => `
     <select id="new-pe-nature" class="sel" style="padding:5px 6px;font-size:10px;margin-top:4px;width:130px;">
@@ -426,7 +426,7 @@ function editPriceEntry(entryId) {
   const d = S.doctors.find(x => x.id === e.doctorId);
   const row = document.getElementById(`price-entry-${entryId}`);
   if (!row) return;
-  const curNature = e.nature || '';
+  const curNature = e.nature || (d && d.defaultNature) || '';
   const curServiceLabel = e.serviceLabel || e.label || '';
   const _editNatureSel = `
     <select id="edit-pe-nature-${entryId}" class="sel" style="padding:5px 6px;font-size:10px;margin-top:4px;width:130px;">
