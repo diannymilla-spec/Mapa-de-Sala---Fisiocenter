@@ -1574,6 +1574,12 @@ function switchCfgTab(tab) {
 function renderDocList() {
     const el = document.getElementById('docListArea');
     if (!el) return;
+    // Atualiza destaque dos botões de filtro
+    document.querySelectorAll('[data-filter-mode]').forEach(btn => {
+        const active = btn.getAttribute('data-filter-mode') === _docListFilter.mode;
+        btn.className = `btn ${active ? 'btn-primary' : 'btn-ghost'}`;
+        btn.style.cssText = 'padding:4px 10px;font-size:9px;font-weight:800;text-transform:uppercase;';
+    });
     const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
     let docs = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived);
     const q = (_docListFilter.query || '').toLowerCase().trim();
@@ -1759,7 +1765,7 @@ function renderCfgBody(tab) {
                        style="width:100%;padding:7px 10px;font-size:11px;margin-bottom:6px;">
                 <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
                     ${[['todos','Todos'],['pendencias','⚠ Pendências'],['sem_atendente','Sem Atendente'],['sem_valor','Sem Valor'],['sem_natureza','Sem Natureza']].map(([m,lbl]) =>
-                        `<button class="btn ${_docListFilter.mode===m?'btn-primary':'btn-ghost'}" style="padding:4px 10px;font-size:9px;font-weight:800;text-transform:uppercase;"
+                        `<button class="btn ${_docListFilter.mode===m?'btn-primary':'btn-ghost'}" data-filter-mode="${m}" style="padding:4px 10px;font-size:9px;font-weight:800;text-transform:uppercase;"
                                  onclick="_docListFilter.mode='${m}';renderDocList()">${lbl}</button>`
                     ).join('')}
                 </div>
