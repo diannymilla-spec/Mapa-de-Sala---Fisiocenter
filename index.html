@@ -86,28 +86,28 @@
     <h3 style="margin-bottom:20px; font-family:'Fraunces'; font-size:18px; color:var(--accent);">Alocar Atendimento</h3>
     <input type="hidden" id="allocKey">
 
-    <div class="form-group">
+    <div class="form-group" id="allocDocGroup">
       <label class="form-label">Médico</label>
-      <select class="sel" id="allocDocId" onchange="onAllocDocChange()"></select>
+      <select class="sel" id="allocDocId" onchange="onAllocDocChange(); clearAllocFieldError('allocDocGroup')"></select>
     </div>
 
     <div class="form-group" id="allocSpecGroup" style="display:none;">
       <label class="form-label">Especialidade</label>
-      <select class="sel" id="allocSpecId" onchange="onAllocSpecChange()"></select>
+      <select class="sel" id="allocSpecId" onchange="onAllocSpecChange(); clearAllocFieldError('allocSpecGroup')"></select>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" id="allocStatusGroup">
       <label class="form-label">Status do Horário</label>
       <div id="tglAllocStatus" style="display:flex;flex-direction:column;gap:6px;">
           <div style="display:flex;gap:6px;">
-              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'active')">Ativo</button>
-              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'canceled')">Cancelado</button>
+              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'active'); clearAllocFieldError('allocStatusGroup')">Ativo</button>
+              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'canceled'); clearAllocFieldError('allocStatusGroup')">Cancelado</button>
           </div>
           <div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);letter-spacing:0.8px;padding-top:4px;border-top:1px solid var(--border);">Dia Especial</div>
           <div style="display:flex;gap:6px;">
-              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'feriado')">Feriado</button>
-              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'diasuS')">🏥 Dia de SuS</button>
-              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'manutencao')">🔧 Manutenção</button>
+              <button class="tgl-btn" style="flex:1" onclick="toggleTgl('tglAllocStatus', this, 'feriado'); clearAllocFieldError('allocStatusGroup')">Feriado</button>
+              <button class="tgl-btn" style="flex:1" onclick="toggleTgl('tglAllocStatus', this, 'diasuS'); clearAllocFieldError('allocStatusGroup')">🏥 Dia de SuS</button>
+              <button class="tgl-btn" style="flex:1" onclick="toggleTgl('tglAllocStatus', this, 'manutencao'); clearAllocFieldError('allocStatusGroup')">🔧 Manutenção</button>
           </div>
       </div>
     </div>
@@ -115,8 +115,8 @@
     <div class="form-group" id="scopeGroup">
       <label class="form-label">Aplicar em:</label>
       <div class="toggle-group" id="tglAllocScope">
-          <button class="tgl-btn" onclick="setTgl('tglAllocScope', this, 'periodo')">Este Turno</button>
-          <button class="tgl-btn" onclick="setTgl('tglAllocScope', this, 'diatodo')">Dia Todo</button>
+          <button class="tgl-btn" onclick="setTgl('tglAllocScope', this, 'periodo'); clearAllocFieldError('scopeGroup')">Este Turno</button>
+          <button class="tgl-btn" onclick="setTgl('tglAllocScope', this, 'diatodo'); clearAllocFieldError('scopeGroup')">Dia Todo</button>
       </div>
     </div>
 

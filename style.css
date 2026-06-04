@@ -163,6 +163,11 @@ body.light-theme .mini-spec { color: var(--t3); }
 .tgl-btn{flex:1; padding:10px; background:var(--s3); border:1px solid var(--border); border-radius:4px; color:var(--t2); cursor:pointer; font-size:10px; font-weight:700; text-transform:uppercase; transition:0.2s}
 .tgl-btn.active{background:var(--accent); color:white; border-color:var(--accent)}
 
+/* Validação visual de campos obrigatórios */
+.field-error>.form-label{color:var(--cancel)!important}
+.field-error .tgl-btn:not(.active){border-color:rgba(224,92,92,0.5)!important;color:var(--cancel)!important}
+.field-error .sel,.field-error .inp{border-color:var(--cancel)!important}
+
 .btn{padding:12px;border-radius:var(--r);cursor:pointer;border:none;font-weight:700;font-size:11px;text-transform:uppercase;transition:0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 5px;}
 .btn-primary{background:var(--accent);color:white}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--t2)}

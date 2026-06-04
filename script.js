@@ -891,6 +891,24 @@ function clearTgl(gid) {
     curTgl[gid] = null;
 }
 
+function toggleTgl(gid, btn, val) {
+    if (btn.classList.contains('active')) {
+        clearTgl(gid);
+    } else {
+        setTgl(gid, btn, val);
+    }
+}
+
+function clearAllocFieldError(id) {
+    document.getElementById(id)?.classList.remove('field-error');
+}
+
+function clearAllocErrors() {
+    ['allocDocGroup', 'allocSpecGroup', 'allocStatusGroup', 'scopeGroup'].forEach(id => {
+        document.getElementById(id)?.classList.remove('field-error');
+    });
+}
+
 // ── ALOCAÇÃO EM MASSA (PINTURA / TOGGLE POR CLIQUE INTELIGENTE) ──
 function toggleMassMode() {
     isMassMode = !isMassMode;
@@ -1043,7 +1061,7 @@ function openAlloc(key) {
   document.getElementById('allocObs').value = slot?.obs || '';
 }
 
-function closeAlloc() { document.getElementById('allocModal').classList.remove('open'); }
+function closeAlloc() { document.getElementById('allocModal').classList.remove('open'); clearAllocErrors(); }
 
 function populateAllocSpecs(docId, currentEntryId) {
     const grp = document.getElementById('allocSpecGroup');
@@ -1320,13 +1338,16 @@ function saveAllocation() {
   const _allocEntry = _allocSpecId ? (S.priceEntries || []).find(e => e.id === _allocSpecId) : null;
   const nature = (_allocEntry && _allocEntry.nature) || (doc && doc.defaultNature) || 'Consulta';
 
-  if (!status) { showToast('SELECIONE O STATUS DO HORÁRIO!'); return; }
+  clearAllocErrors();
+  let _hasAllocError = false;
+  if (!status) { document.getElementById('allocStatusGroup')?.classList.add('field-error'); _hasAllocError = true; }
   const noDocNeeded = status === 'feriado' || status === 'manutencao' || status === 'diasuS';
-  if (!scope && status !== 'diasuS') { showToast('SELECIONE ONDE APLICAR (ESTE TURNO / DIA TODO)!'); return; }
-  if(!docId && !noDocNeeded) { showToast("SELECIONE UM MÉDICO!"); return; }
+  if (!scope && status !== 'diasuS') { document.getElementById('scopeGroup')?.classList.add('field-error'); _hasAllocError = true; }
+  if (!docId && !noDocNeeded) { document.getElementById('allocDocGroup')?.classList.add('field-error'); _hasAllocError = true; }
   const allocSpecId = document.getElementById('allocSpecId')?.value || null;
   const specVisible = document.getElementById('allocSpecGroup')?.style.display !== 'none';
-  if (!noDocNeeded && specVisible && !allocSpecId) { showToast("SELECIONE A ESPECIALIDADE!"); return; }
+  if (!noDocNeeded && specVisible && !allocSpecId) { document.getElementById('allocSpecGroup')?.classList.add('field-error'); _hasAllocError = true; }
+  if (_hasAllocError) return;
 
   const unit  = S.units.find(u => u.id === S.currentUnit);
   const parts = key.split('|');
