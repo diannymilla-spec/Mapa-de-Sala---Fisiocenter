@@ -1,4 +1,4 @@
-const CACHE = 'fisiocenter-v26';
+const CACHE = 'fisiocenter-v27';
 const ASSETS = ['/', '/index.html', '/style.css', '/script.js', '/mobile-styles.css', '/mobile-script.js'];
 
 self.addEventListener('install', e => {

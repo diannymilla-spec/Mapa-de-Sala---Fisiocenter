@@ -74,6 +74,7 @@ let _pendingDocEntries = [];
 let _docEntryListId = 'doc-entries-list';
 let _activeEditDocId = null;
 let _editingEntryIdx = -1;
+let _docListFilter = { query: '', mode: 'todos' };
 
 // ── FORÇAR TEXTOS (MAIÚSCULAS/TITLE CASE) ──
 document.addEventListener('input', function(e) {
@@ -1025,10 +1026,8 @@ function openAlloc(key) {
   document.getElementById('btnDelAlloc').style.display = (slot || !!S.slots[diasuSKey]) ? 'block' : 'none';
 
   const st = S.slots[diasuSKey] ? 'diasuS' : (slot ? slot.status : 'active');
-  const nt = slot ? (slot.nature || 'Consulta') : 'Consulta';
 
   setTgl('tglAllocStatus', document.querySelector(`#tglAllocStatus .tgl-btn[onclick*="'${st}'"]`), st);
-  setTgl('tglAllocNature', document.querySelector(`#tglAllocNature .tgl-btn[onclick*="'${nt}'"]`), nt);
   setTgl('tglAllocScope', document.querySelector(`#tglAllocScope .tgl-btn[onclick*="'periodo'"]`), 'periodo');
 
   document.getElementById('allocObs').value = slot?.obs || '';
@@ -1059,21 +1058,11 @@ function onAllocDocChange() {
     populateAllocSpecs(docId, null);
     if (docId) {
         const doc = S.doctors.find(d => d.id === docId);
-        if (doc?.defaultNature) {
-            const btn = document.querySelector(`#tglAllocNature .tgl-btn[onclick*="'${doc.defaultNature}'"]`);
-            if (btn) setTgl('tglAllocNature', btn, doc.defaultNature);
-        }
     }
 }
 
 function onAllocSpecChange() {
-    const entryId = document.getElementById('allocSpecId')?.value;
-    if (!entryId) return;
-    const entry = (S.priceEntries || []).find(e => e.id === entryId);
-    if (entry?.nature) {
-        const btn = document.querySelector(`#tglAllocNature .tgl-btn[onclick*="'${entry.nature}'"]`);
-        if (btn) setTgl('tglAllocNature', btn, entry.nature);
-    }
+    // Nature is derived automatically from the entry on save — no toggle to update
 }
 
 // BUSCA DE MÉDICO
@@ -1317,7 +1306,9 @@ function saveAllocation() {
   const scope  = curTgl.tglAllocScope;
   const obs    = document.getElementById('allocObs').value.trim();
   const doc    = S.doctors.find(d => d.id === docId);
-  const nature = curTgl.tglAllocNature || (doc && doc.defaultNature) || 'Consulta';
+  const _allocSpecId = document.getElementById('allocSpecId')?.value || null;
+  const _allocEntry = _allocSpecId ? (S.priceEntries || []).find(e => e.id === _allocSpecId) : null;
+  const nature = (_allocEntry && _allocEntry.nature) || (doc && doc.defaultNature) || 'Consulta';
 
   const noDocNeeded = status === 'feriado' || status === 'manutencao' || status === 'diasuS';
   if(!docId && !noDocNeeded) { showToast("SELECIONE UM MÉDICO!"); return; }
@@ -1502,6 +1493,60 @@ function switchCfgTab(tab) {
   renderCfgBody(tab);
 }
 
+function renderDocList() {
+    const el = document.getElementById('docListArea');
+    if (!el) return;
+    const sortByName = (a, b) => a.name.replace(/^(Dr\.|Dra\.)\s+/i, '').localeCompare(b.name.replace(/^(Dr\.|Dra\.)\s+/i, ''), 'pt-BR');
+    let docs = S.doctors.filter(d => d.unitId === S.currentUnit && !d.archived);
+    const q = (_docListFilter.query || '').toLowerCase().trim();
+    if (q) {
+        docs = docs.filter(d => {
+            if (d.name.toLowerCase().includes(q) || (d.spec || '').toLowerCase().includes(q)) return true;
+            const att = d.attendantId ? (S.attendants || []).find(a => a.id === d.attendantId) : null;
+            if (att && att.name.toLowerCase().includes(q)) return true;
+            return (S.priceEntries || []).filter(e => e.doctorId === d.id && e.unitId === S.currentUnit)
+                .some(e => (e.label || '').toLowerCase().includes(q) || (e.serviceLabel || '').toLowerCase().includes(q));
+        });
+    }
+    if (_docListFilter.mode !== 'todos') {
+        docs = docs.filter(d => {
+            const hasAtt = !!d.attendantId;
+            const hasVal = (S.priceEntries || []).some(e => e.doctorId === d.id && e.unitId === S.currentUnit && (e.priceParticular || e.priceCartao));
+            const hasNat = !!d.defaultNature;
+            if (_docListFilter.mode === 'sem_atendente') return !hasAtt;
+            if (_docListFilter.mode === 'sem_valor')     return !hasVal;
+            if (_docListFilter.mode === 'sem_natureza')  return !hasNat;
+            if (_docListFilter.mode === 'pendencias')    return !hasAtt || !hasVal || !hasNat;
+            return true;
+        });
+    }
+    docs = docs.sort(sortByName);
+    if (docs.length === 0) {
+        el.innerHTML = '<div style="font-size:11px;color:var(--t3);padding:20px;text-align:center;">Nenhum profissional encontrado.</div>';
+        return;
+    }
+    el.innerHTML = docs.map(d => {
+        const hasSlots = Object.values(S.slots || {}).some(s => s.doctorId === d.id);
+        const att = d.attendantId ? (S.attendants || []).find(a => a.id === d.attendantId) : null;
+        const hasVal = (S.priceEntries || []).some(e => e.doctorId === d.id && e.unitId === S.currentUnit && (e.priceParticular || e.priceCartao));
+        const hasNat = !!d.defaultNature;
+        const pendencies = [...(!d.attendantId ? ['Sem atendente'] : []), ...(!hasVal ? ['Sem valor'] : []), ...(!hasNat ? ['Sem natureza'] : [])];
+        return `<div class="cfg-row" id="row-d-${d.id}">
+            <div style="display:flex;flex-direction:column;gap:2px;">
+                <strong>${d.name}</strong>
+                <small>${d.spec}</small>
+                ${att ? `<small style="color:var(--accent);font-size:9px;">👤 ${att.name}</small>` : ''}
+                ${pendencies.length > 0 ? `<small style="color:var(--feriado);font-size:9px;">⚠ ${pendencies.join(' · ')}</small>` : ''}
+            </div>
+            <div class="cfg-row-actions">
+                <button class="btn btn-edit" onclick="editDoctor('${d.id}')">✎</button>
+                <button class="btn btn-archive" onclick="archiveDoctor('${d.id}')" title="Arquivar profissional">⊘</button>
+                ${hasSlots ? '' : `<button class="btn btn-danger" style="padding:5px 10px" onclick="deleteDoctor('${d.id}')">✕</button>`}
+            </div>
+        </div>`;
+    }).join('');
+}
+
 function renderCfgBody(tab) {
     const body = document.getElementById('cfgBody');
     const unit = S.units.find(u => u.id === S.currentUnit);
@@ -1544,6 +1589,7 @@ function renderCfgBody(tab) {
         _docEntryListId = 'doc-entries-list';
         _activeEditDocId = null;
         _editingEntryIdx = -1;
+        _docListFilter = { query: '', mode: 'todos' };
         body.innerHTML = `
             <div id="docAddForm" style="background:var(--s2);padding:16px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;">
                 <div style="font-size:9px;font-weight:900;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">
@@ -1627,21 +1673,19 @@ function renderCfgBody(tab) {
                 <button class="btn btn-primary" style="width:100%;padding:10px;font-size:13px;" onclick="addDoctor()">✓ Cadastrar Médico</button>
             </div>
 
-            <div>${activeDocs.map(d => {
-                const hasSlots = Object.values(S.slots || {}).some(s => s.doctorId === d.id);
-                return `
-                <div class="cfg-row" id="row-d-${d.id}">
-                    <div style="display:flex; flex-direction:column">
-                        <strong>${d.name}</strong>
-                        <small>${d.spec}</small>
-                    </div>
-                    <div class="cfg-row-actions">
-                        <button class="btn btn-edit" onclick="editDoctor('${d.id}')">✎</button>
-                        <button class="btn btn-archive" onclick="archiveDoctor('${d.id}')" title="Arquivar profissional">⊘</button>
-                        ${hasSlots ? '' : `<button class="btn btn-danger" style="padding:5px 10px" onclick="deleteDoctor('${d.id}')">✕</button>`}
-                    </div>
-                </div>`;
-            }).join('')}
+            <!-- Busca e filtros -->
+            <div style="margin-top:4px;">
+                <input type="text" class="inp" placeholder="Buscar por nome, especialidade ou atendente..."
+                       value="${_docListFilter.query}"
+                       oninput="_docListFilter.query=this.value;renderDocList()"
+                       style="width:100%;padding:7px 10px;font-size:11px;margin-bottom:6px;">
+                <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
+                    ${[['todos','Todos'],['pendencias','⚠ Pendências'],['sem_atendente','Sem Atendente'],['sem_valor','Sem Valor'],['sem_natureza','Sem Natureza']].map(([m,lbl]) =>
+                        `<button class="btn ${_docListFilter.mode===m?'btn-primary':'btn-ghost'}" style="padding:4px 10px;font-size:9px;font-weight:800;text-transform:uppercase;"
+                                 onclick="_docListFilter.mode='${m}';renderDocList()">${lbl}</button>`
+                    ).join('')}
+                </div>
+                <div id="docListArea"></div>
             </div>
 
             ${archivedDocs.length > 0 ? `
@@ -1662,7 +1706,7 @@ function renderCfgBody(tab) {
                 </div>`).join('')}
             </div>` : ''}
         `;
-        setTimeout(() => { const inp = document.getElementById('newDocName'); if (inp) inp.focus(); }, 30);
+        setTimeout(() => { renderDocList(); const inp = document.getElementById('newDocName'); if (inp) inp.focus(); }, 30);
     } else if(tab === 'atendentes') {
         if (!S.attendants) S.attendants = [];
         const atts = S.attendants.filter(a => a.unitId === S.currentUnit);
