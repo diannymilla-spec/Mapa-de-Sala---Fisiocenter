@@ -101,10 +101,11 @@
       <div id="tglAllocStatus" style="display:flex;flex-direction:column;gap:6px;">
           <div style="display:flex;gap:6px;">
               <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'active')">Ativo</button>
-              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'feriado')">Feriado</button>
-          </div>
-          <div style="display:flex;gap:6px;">
               <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'canceled')">Cancelado</button>
+          </div>
+          <div style="font-size:8px;font-weight:900;text-transform:uppercase;color:var(--t3);letter-spacing:0.8px;padding-top:4px;border-top:1px solid var(--border);">Dia Especial</div>
+          <div style="display:flex;gap:6px;">
+              <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'feriado')">Feriado</button>
               <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'diasuS')">🏥 Dia de SuS</button>
               <button class="tgl-btn" style="flex:1" onclick="setTgl('tglAllocStatus', this, 'manutencao')">🔧 Manutenção</button>
           </div>
