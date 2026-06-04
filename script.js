@@ -886,6 +886,11 @@ function setTgl(gid, btn, val) {
     else curTgl[gid] = val;
 }
 
+function clearTgl(gid) {
+    document.querySelectorAll(`#${gid} .tgl-btn`).forEach(b => b.classList.remove('active'));
+    curTgl[gid] = null;
+}
+
 // ── ALOCAÇÃO EM MASSA (PINTURA / TOGGLE POR CLIQUE INTELIGENTE) ──
 function toggleMassMode() {
     isMassMode = !isMassMode;
@@ -1025,10 +1030,15 @@ function openAlloc(key) {
   const diasuSKey = `${parts0[0]}|diasuS|${date0}|dia`;
   document.getElementById('btnDelAlloc').style.display = (slot || !!S.slots[diasuSKey]) ? 'block' : 'none';
 
-  const st = S.slots[diasuSKey] ? 'diasuS' : (slot ? slot.status : 'active');
+  const st = S.slots[diasuSKey] ? 'diasuS' : (slot ? slot.status : null);
 
-  setTgl('tglAllocStatus', document.querySelector(`#tglAllocStatus .tgl-btn[onclick*="'${st}'"]`), st);
-  setTgl('tglAllocScope', document.querySelector(`#tglAllocScope .tgl-btn[onclick*="'periodo'"]`), 'periodo');
+  if (st) {
+      const stBtn = document.querySelector(`#tglAllocStatus .tgl-btn[onclick*="'${st}'"]`);
+      if (stBtn) setTgl('tglAllocStatus', stBtn, st);
+  } else {
+      clearTgl('tglAllocStatus');
+  }
+  clearTgl('tglAllocScope');
 
   document.getElementById('allocObs').value = slot?.obs || '';
 }
@@ -1310,7 +1320,9 @@ function saveAllocation() {
   const _allocEntry = _allocSpecId ? (S.priceEntries || []).find(e => e.id === _allocSpecId) : null;
   const nature = (_allocEntry && _allocEntry.nature) || (doc && doc.defaultNature) || 'Consulta';
 
+  if (!status) { showToast('SELECIONE O STATUS DO HORÁRIO!'); return; }
   const noDocNeeded = status === 'feriado' || status === 'manutencao' || status === 'diasuS';
+  if (!scope && status !== 'diasuS') { showToast('SELECIONE ONDE APLICAR (ESTE TURNO / DIA TODO)!'); return; }
   if(!docId && !noDocNeeded) { showToast("SELECIONE UM MÉDICO!"); return; }
   const allocSpecId = document.getElementById('allocSpecId')?.value || null;
   const specVisible = document.getElementById('allocSpecGroup')?.style.display !== 'none';
