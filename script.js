@@ -789,7 +789,9 @@ function slotHTML(slot, key, isMonthView) {
 
   const typeDisplay = typeTxt === 'hora' ? 'Hora Marcada' : 'Ordem de Chegada';
   const attendant = doc.attendantId ? (S.attendants || []).find(a => a.id === doc.attendantId) : null;
-  let tooltip = `${doc.name}\nEspecialidade: ${doc.spec}\nNatureza: ${natureTxt}\nAtendimento: ${typeDisplay}${attendant ? '\nAtendente: ' + attendant.name : ''}`;
+  const slotEntry = slot.entryId ? (S.priceEntries || []).find(e => e.id === slot.entryId) : null;
+  const slotSpecLabel = slotEntry ? (slotEntry.serviceLabel || slotEntry.label) : null;
+  let tooltip = `${doc.name}\nEspecialidade: ${slotSpecLabel || doc.spec}\nNatureza: ${natureTxt}\nAtendimento: ${typeDisplay}${attendant ? '\nAtendente: ' + attendant.name : ''}`;
 
   // Preços: prioriza entradas da Tabela de Preços filtradas pela natureza do slot
   const _peEntries = (S.priceEntries || []).filter(e =>
@@ -826,7 +828,7 @@ function slotHTML(slot, key, isMonthView) {
       const nameParts = displayNameFull.split(' ');
       nameHTML = `<span class="mini-name">${nameParts[0]}</span>`;
       if (nameParts.length > 1) nameHTML += `<span class="mini-name">${nameParts.slice(1).join(' ')}</span>`;
-      nameHTML += `<span class="mini-spec">${doc.spec}</span>`;
+      nameHTML += `<span class="mini-spec">${slotSpecLabel || doc.spec}</span>`;
   }
 
   return `
@@ -907,6 +909,28 @@ function clearAllocErrors() {
     ['allocDocGroup', 'allocSpecGroup', 'allocStatusGroup', 'scopeGroup'].forEach(id => {
         document.getElementById(id)?.classList.remove('field-error');
     });
+}
+
+function setAllocMainStatus(btn, val) {
+    // Limpa dia especial
+    document.querySelectorAll('#tglAllocDaySpecial .tgl-btn').forEach(b => b.classList.remove('active'));
+    // Seta status principal
+    setTgl('tglAllocStatus', btn, val);
+    clearAllocFieldError('allocStatusGroup');
+}
+
+function toggleAllocDaySpecial(btn, val) {
+    const wasActive = btn.classList.contains('active');
+    // Limpa grupo principal
+    document.querySelectorAll('#tglAllocStatus .tgl-btn').forEach(b => b.classList.remove('active'));
+    curTgl.tglAllocStatus = null;
+    // Limpa todas do especial
+    document.querySelectorAll('#tglAllocDaySpecial .tgl-btn').forEach(b => b.classList.remove('active'));
+    if (!wasActive) {
+        btn.classList.add('active');
+        curTgl.tglAllocStatus = val;
+    }
+    clearAllocFieldError('allocStatusGroup');
 }
 
 // ── ALOCAÇÃO EM MASSA (PINTURA / TOGGLE POR CLIQUE INTELIGENTE) ──
@@ -1050,11 +1074,18 @@ function openAlloc(key) {
 
   const st = S.slots[diasuSKey] ? 'diasuS' : (slot ? slot.status : null);
 
+  const _daySpecials = ['feriado', 'diasuS', 'manutencao'];
   if (st) {
-      const stBtn = document.querySelector(`#tglAllocStatus .tgl-btn[onclick*="'${st}'"]`);
-      if (stBtn) setTgl('tglAllocStatus', stBtn, st);
+      if (_daySpecials.includes(st)) {
+          const stBtn = document.querySelector(`#tglAllocDaySpecial [data-val="${st}"]`);
+          if (stBtn) { stBtn.classList.add('active'); curTgl.tglAllocStatus = st; }
+      } else {
+          const stBtn = document.querySelector(`#tglAllocStatus [data-val="${st}"]`);
+          if (stBtn) setTgl('tglAllocStatus', stBtn, st);
+      }
   } else {
       clearTgl('tglAllocStatus');
+      document.querySelectorAll('#tglAllocDaySpecial .tgl-btn').forEach(b => b.classList.remove('active'));
   }
   clearTgl('tglAllocScope');
 
