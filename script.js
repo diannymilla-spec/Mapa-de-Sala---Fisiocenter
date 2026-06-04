@@ -64,8 +64,9 @@ let dashGroupBy = 'week';
 let curTgl = {
     tglPrefix:'Dr.',
     tglType:'hora',
-    tglAllocStatus:'active',
-    tglAllocScope:'periodo',
+    tglAllocStatus: null,
+    tglAllocScope: null,
+    tglAllocDiaSuS: false,
     tglAllocNature: 'Consulta',
     tglDefaultNature: ''
 };
@@ -912,23 +913,30 @@ function clearAllocErrors() {
 }
 
 function setAllocMainStatus(btn, val) {
-    // Limpa dia especial
-    document.querySelectorAll('#tglAllocDaySpecial .tgl-btn').forEach(b => b.classList.remove('active'));
-    // Seta status principal
+    // Limpa Feriado e Manutenção (mas mantém Dia de SuS)
+    ['feriado', 'manutencao'].forEach(v => {
+        document.querySelector(`#tglAllocDaySpecial [data-val="${v}"]`)?.classList.remove('active');
+    });
+    if (curTgl.tglAllocStatus === 'feriado' || curTgl.tglAllocStatus === 'manutencao') curTgl.tglAllocStatus = null;
     setTgl('tglAllocStatus', btn, val);
     clearAllocFieldError('allocStatusGroup');
 }
 
 function toggleAllocDaySpecial(btn, val) {
-    const wasActive = btn.classList.contains('active');
-    // Limpa grupo principal
-    document.querySelectorAll('#tglAllocStatus .tgl-btn').forEach(b => b.classList.remove('active'));
-    curTgl.tglAllocStatus = null;
-    // Limpa todas do especial
-    document.querySelectorAll('#tglAllocDaySpecial .tgl-btn').forEach(b => b.classList.remove('active'));
-    if (!wasActive) {
-        btn.classList.add('active');
-        curTgl.tglAllocStatus = val;
+    if (val === 'diasuS') {
+        // Dia de SuS: toggle independente, não afeta Ativo/Cancelado
+        const wasActive = btn.classList.contains('active');
+        btn.classList.toggle('active');
+        curTgl.tglAllocDiaSuS = !wasActive;
+    } else {
+        // Feriado / Manutenção: substituem o status principal
+        const wasActive = btn.classList.contains('active');
+        document.querySelectorAll('#tglAllocStatus .tgl-btn').forEach(b => b.classList.remove('active'));
+        curTgl.tglAllocStatus = null;
+        document.querySelector('#tglAllocDaySpecial [data-val="diasuS"]')?.classList.remove('active');
+        curTgl.tglAllocDiaSuS = false;
+        document.querySelectorAll('#tglAllocDaySpecial .tgl-btn').forEach(b => b.classList.remove('active'));
+        if (!wasActive) { btn.classList.add('active'); curTgl.tglAllocStatus = val; }
     }
     clearAllocFieldError('allocStatusGroup');
 }
@@ -1074,18 +1082,25 @@ function openAlloc(key) {
 
   const st = S.slots[diasuSKey] ? 'diasuS' : (slot ? slot.status : null);
 
-  const _daySpecials = ['feriado', 'diasuS', 'manutencao'];
+  // Reset ambos os grupos
+  clearTgl('tglAllocStatus');
+  document.querySelectorAll('#tglAllocDaySpecial .tgl-btn').forEach(b => b.classList.remove('active'));
+  curTgl.tglAllocDiaSuS = false;
+
   if (st) {
-      if (_daySpecials.includes(st)) {
+      if (st === 'feriado' || st === 'manutencao') {
           const stBtn = document.querySelector(`#tglAllocDaySpecial [data-val="${st}"]`);
           if (stBtn) { stBtn.classList.add('active'); curTgl.tglAllocStatus = st; }
-      } else {
+      } else if (st === 'active' || st === 'canceled') {
           const stBtn = document.querySelector(`#tglAllocStatus [data-val="${st}"]`);
           if (stBtn) setTgl('tglAllocStatus', stBtn, st);
       }
-  } else {
-      clearTgl('tglAllocStatus');
-      document.querySelectorAll('#tglAllocDaySpecial .tgl-btn').forEach(b => b.classList.remove('active'));
+  }
+  // Pre-seleciona Dia de SuS se marcador existir
+  if (S.slots[diasuSKey]) {
+      const diasuSBtn = document.querySelector('#tglAllocDaySpecial [data-val="diasuS"]');
+      if (diasuSBtn) diasuSBtn.classList.add('active');
+      curTgl.tglAllocDiaSuS = true;
   }
   clearTgl('tglAllocScope');
 
@@ -1369,11 +1384,12 @@ function saveAllocation() {
   const _allocEntry = _allocSpecId ? (S.priceEntries || []).find(e => e.id === _allocSpecId) : null;
   const nature = (_allocEntry && _allocEntry.nature) || (doc && doc.defaultNature) || 'Consulta';
 
+  const diaSuS = curTgl.tglAllocDiaSuS;
   clearAllocErrors();
   let _hasAllocError = false;
-  if (!status) { document.getElementById('allocStatusGroup')?.classList.add('field-error'); _hasAllocError = true; }
-  const noDocNeeded = status === 'feriado' || status === 'manutencao' || status === 'diasuS';
-  if (!scope && status !== 'diasuS') { document.getElementById('scopeGroup')?.classList.add('field-error'); _hasAllocError = true; }
+  if (!status && !diaSuS) { document.getElementById('allocStatusGroup')?.classList.add('field-error'); _hasAllocError = true; }
+  const noDocNeeded = status === 'feriado' || status === 'manutencao' || (!status && diaSuS);
+  if (!scope && (status === 'active' || status === 'canceled' || status === 'feriado' || status === 'manutencao')) { document.getElementById('scopeGroup')?.classList.add('field-error'); _hasAllocError = true; }
   if (!docId && !noDocNeeded) { document.getElementById('allocDocGroup')?.classList.add('field-error'); _hasAllocError = true; }
   const allocSpecId = document.getElementById('allocSpecId')?.value || null;
   const specVisible = document.getElementById('allocSpecGroup')?.style.display !== 'none';
@@ -1386,6 +1402,15 @@ function saveAllocation() {
   const period = parts[3];
 
   const toSave = {};
+  let _savedMsg = '';
+
+  // Dia de SuS: marcador independente do status principal
+  if (diaSuS) {
+      const diasuSKey = `${parts[0]}|diasuS|${date}|dia`;
+      S.slots[diasuSKey] = { status: 'diasuS', doctorId: null };
+      toSave[diasuSKey] = S.slots[diasuSKey];
+      _savedMsg = 'DIA MARCADO COMO DIA DE SUS';
+  }
 
   if (status === 'feriado') {
       unit.rooms.filter(r => !r.archived && (!r.archivedFrom || date < r.archivedFrom)).forEach(room => {
@@ -1399,36 +1424,25 @@ function saveAllocation() {
               toSave[k2] = S.slots[k2];
           }
       });
-      showToast(scope === 'diatodo' ? "DIA TODO MARCADO COMO FERIADO" : "TURNO MARCADO COMO FERIADO");
+      _savedMsg = scope === 'diatodo' ? "DIA TODO MARCADO COMO FERIADO" : "TURNO MARCADO COMO FERIADO";
   } else if (status === 'manutencao') {
-      const applyM = (k) => {
-          S.slots[k] = { status: 'manutencao', doctorId: null };
-          toSave[k] = S.slots[k];
-      };
+      const applyM = (k) => { S.slots[k] = { status: 'manutencao', doctorId: null }; toSave[k] = S.slots[k]; };
       applyM(key);
-      if(scope === 'diatodo') {
-          applyM(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
-      }
-      showToast(scope === 'diatodo' ? "DIA TODO MARCADO COMO MANUTENÇÃO" : "TURNO MARCADO COMO MANUTENÇÃO");
-  } else if (status === 'diasuS') {
-      const diasuSKey = `${parts[0]}|diasuS|${date}|dia`;
-      S.slots[diasuSKey] = { status: 'diasuS', doctorId: null };
-      toSave[diasuSKey] = S.slots[diasuSKey];
-      showToast("DIA MARCADO COMO DIA DE SUS");
-  } else {
+      if (scope === 'diatodo') applyM(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
+      _savedMsg = scope === 'diatodo' ? "DIA TODO MARCADO COMO MANUTENÇÃO" : "TURNO MARCADO COMO MANUTENÇÃO";
+  } else if (status === 'active' || status === 'canceled') {
       const apply = (k) => {
           S.slots[k] = { doctorId: docId, status, nature, obs, entryId: allocSpecId || null };
           toSave[k] = S.slots[k];
       };
       apply(key);
-      if(scope === 'diatodo') {
-          apply(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
-      }
-      showToast("ALOCAÇÃO SALVA!");
+      if (scope === 'diatodo') apply(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
+      _savedMsg = _savedMsg || "ALOCAÇÃO SALVA!";
   }
 
   upsertSlots(toSave);
   closeAlloc(); renderMain();
+  showToast(_savedMsg || 'SALVO!');
 }
 
 function deleteAllocation() {
@@ -1883,6 +1897,14 @@ function setEditTglWithPrices(gid, btn, priceGroupId) {
 }
 
 // ── Gestão de entradas de especialidade no formulário de médico ──
+function _getDocEntInput(id) {
+    if (_activeEditDocId) {
+        const row = document.getElementById('row-d-' + _activeEditDocId);
+        if (row) return row.querySelector('#' + id);
+    }
+    return document.getElementById(id);
+}
+
 function _getDefaultNatureFromToggle() {
     if (_activeEditDocId) {
         const btn = document.querySelector(`#edit-tglDefNature-${_activeEditDocId} .active`);
@@ -1933,9 +1955,9 @@ function editDocEntry(i) {
     const e = _pendingDocEntries[i];
     if (!e) return;
     _editingEntryIdx = i;
-    const l = document.getElementById('doc-ent-label');
-    const pp = document.getElementById('doc-ent-pp');
-    const pc = document.getElementById('doc-ent-pc');
+    const l = _getDocEntInput('doc-ent-label');
+    const pp = _getDocEntInput('doc-ent-pp');
+    const pc = _getDocEntInput('doc-ent-pc');
     if (l) { l.value = e.label || ''; }
     if (pp) pp.value = e.priceParticular || '';
     if (pc) pc.value = e.priceCartao || '';
@@ -1947,9 +1969,9 @@ function editDocEntry(i) {
 
 function cancelDocEntry() {
     _editingEntryIdx = -1;
-    const l = document.getElementById('doc-ent-label');
-    const pp = document.getElementById('doc-ent-pp');
-    const pc = document.getElementById('doc-ent-pc');
+    const l = _getDocEntInput('doc-ent-label');
+    const pp = _getDocEntInput('doc-ent-pp');
+    const pc = _getDocEntInput('doc-ent-pc');
     if (l) { l.value = ''; l.focus(); }
     if (pp) pp.value = '';
     if (pc) pc.value = '';
@@ -1959,12 +1981,12 @@ function cancelDocEntry() {
 }
 
 function confirmAddDocEntry() {
-    const label = document.getElementById('doc-ent-label')?.value.trim();
+    const label = _getDocEntInput('doc-ent-label')?.value.trim();
     if (!label) { showToast('INFORME A ESPECIALIDADE'); return; }
     if (label.length > 60) { showToast('ESPECIALIDADE MUITO LONGA (máx 60 chars)'); return; }
     const nature = _getDefaultNatureFromToggle() || null;
-    const pp = nature !== 'Procedimento' ? document.getElementById('doc-ent-pp')?.value.trim() : '';
-    const pc = nature !== 'Procedimento' ? document.getElementById('doc-ent-pc')?.value.trim() : '';
+    const pp = nature !== 'Procedimento' ? _getDocEntInput('doc-ent-pp')?.value.trim() : '';
+    const pc = nature !== 'Procedimento' ? _getDocEntInput('doc-ent-pc')?.value.trim() : '';
     if (nature && nature !== 'Procedimento' && !pp && !pc) {
         showToast('INFORME AO MENOS UM VALOR (Particular ou Cartão)');
         return;
