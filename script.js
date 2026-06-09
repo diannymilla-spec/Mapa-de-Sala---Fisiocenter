@@ -60,6 +60,7 @@ let dashRange = 'month';
 let dashCustomStart = '';
 let dashCustomEnd = '';
 let dashGroupBy = 'week';
+let _dashDocFilter = '';
 
 let curTgl = {
     tglPrefix:'Dr.',
@@ -2339,6 +2340,7 @@ function showToast(m){ const t=document.getElementById('toast'); t.textContent=m
 // ── DASHBOARD ──────────────────────────────────────────────────────
 function setDashRange(v) { dashRange = v; renderDashboard(); }
 function setDashGroup(v) { dashGroupBy = v; renderDashboard(); }
+function setDashDocFilter(v) { _dashDocFilter = v; renderDashboard(); }
 
 function renderDashboard() {
     const el = document.getElementById('mainContent');
@@ -2363,10 +2365,13 @@ function renderDashboard() {
     }
 
     // ── Filtra slots da unidade e período ──
-    const entries = Object.entries(S.slots).filter(([key]) => {
+    let entries = Object.entries(S.slots).filter(([key]) => {
         const p = key.split('|');
         return p[0] === S.currentUnit && p[2] >= startDate && p[2] <= endDate;
     });
+    if (_dashDocFilter) {
+        entries = entries.filter(([,s]) => s.doctorId === _dashDocFilter);
+    }
 
     // ── KPIs ──
     const realEntries = entries.filter(([,s]) => s.status !== 'feriado' && s.status !== 'manutencao' && s.status !== 'diasuS');
@@ -2442,11 +2447,21 @@ function renderDashboard() {
             <input type="date" class="inp" value="${dashCustomEnd}" onchange="dashCustomEnd=this.value;renderDashboard()" style="width:140px;padding:5px 8px;font-size:11px;">
           ` : `<span style="font-size:10px;color:var(--t2);font-weight:700;">${startDate} → ${endDate}</span>`}
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;white-space:nowrap;">Agrupar por:</span>
-          <div class="toggle-group" style="width:auto;gap:4px;">
-            <button class="tgl-btn ${dashGroupBy==='week'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashGroup('week')">Semana</button>
-            <button class="tgl-btn ${dashGroupBy==='month'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashGroup('month')">Mês</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;white-space:nowrap;">Agrupar por:</span>
+            <div class="toggle-group" style="width:auto;gap:4px;">
+              <button class="tgl-btn ${dashGroupBy==='week'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashGroup('week')">Semana</button>
+              <button class="tgl-btn ${dashGroupBy==='month'?'active':''}" style="padding:5px 12px;flex:none;" onclick="setDashGroup('month')">Mês</button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;white-space:nowrap;">Profissional:</span>
+            <select class="sel" style="padding:5px 8px;font-size:11px;min-width:180px;" onchange="setDashDocFilter(this.value)">
+              <option value="">Todos</option>
+              ${(S.doctors||[]).filter(d=>!d.archived).sort((a,b)=>a.name.localeCompare(b.name)).map(d=>`<option value="${d.id}" ${_dashDocFilter===d.id?'selected':''}>${d.name}</option>`).join('')}
+            </select>
+            ${_dashDocFilter ? `<button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="setDashDocFilter('')">✕ Limpar</button>` : ''}
           </div>
         </div>
       </div>
