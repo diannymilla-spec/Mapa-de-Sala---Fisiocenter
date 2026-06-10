@@ -1907,8 +1907,7 @@ function setEditTglWithPrices(gid, btn, priceGroupId) {
 // ── Gestão de entradas de especialidade no formulário de médico ──
 function _getDocEntInput(id) {
     if (_activeEditDocId) {
-        const row = document.getElementById('row-d-' + _activeEditDocId);
-        if (row) return row.querySelector('#' + id);
+        return document.getElementById(id + '-' + _activeEditDocId);
     }
     return document.getElementById(id);
 }
@@ -1969,7 +1968,8 @@ function editDocEntry(i) {
     if (l) { l.value = e.label || ''; }
     if (pp) pp.value = e.priceParticular || '';
     if (pc) pc.value = e.priceCartao || '';
-    const btn = document.getElementById('doc-ent-add-btn');
+    const btnId2 = _activeEditDocId ? 'doc-ent-add-btn-' + _activeEditDocId : 'doc-ent-add-btn';
+    const btn = document.getElementById(btnId2);
     if (btn) btn.textContent = '✓ Atualizar Especialidade';
     renderDocEntriesList();
     if (l) l.focus();
@@ -1983,7 +1983,8 @@ function cancelDocEntry() {
     if (l) { l.value = ''; l.focus(); }
     if (pp) pp.value = '';
     if (pc) pc.value = '';
-    const btn = document.getElementById('doc-ent-add-btn');
+    const btnId = _activeEditDocId ? 'doc-ent-add-btn-' + _activeEditDocId : 'doc-ent-add-btn';
+    const btn = document.getElementById(btnId);
     if (btn) btn.textContent = '+ Adicionar Especialidade';
     renderDocEntriesList();
 }
@@ -2106,23 +2107,23 @@ function editDoctor(id) {
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
                 <div style="flex:2;min-width:130px;">
                     <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Especialidade</label>
-                    <input type="text" class="inp" id="doc-ent-label" placeholder="Ex: Ginecologia" style="padding:6px 8px;" maxlength="60">
+                    <input type="text" class="inp" id="doc-ent-label-${id}" placeholder="Ex: Ginecologia" style="padding:6px 8px;" maxlength="60">
                 </div>
-                <div id="doc-ent-prices" style="display:flex;gap:8px;flex:2;min-width:160px;">
+                <div id="doc-ent-prices-${id}" style="display:flex;gap:8px;flex:2;min-width:160px;">
                     <div style="flex:1;">
                         <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Particular R$</label>
-                        <input type="text" class="inp" id="doc-ent-pp" placeholder="0,00" style="padding:6px 8px;">
+                        <input type="text" class="inp" id="doc-ent-pp-${id}" placeholder="0,00" style="padding:6px 8px;">
                     </div>
                     <div style="flex:1;">
                         <label style="font-size:9px;color:var(--t3);font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;">Cartão R$</label>
-                        <input type="text" class="inp" id="doc-ent-pc" placeholder="0,00" style="padding:6px 8px;">
+                        <input type="text" class="inp" id="doc-ent-pc-${id}" placeholder="0,00" style="padding:6px 8px;">
                     </div>
                 </div>
             </div>
 
             <div style="display:flex;gap:8px;margin-bottom:10px;">
                 <button class="btn btn-ghost" style="flex:1;" onclick="cancelDocEntry()">✕ Limpar</button>
-                <button class="btn btn-primary" style="flex:1;" onclick="confirmAddDocEntry()">+ Adicionar Especialidade</button>
+                <button id="doc-ent-add-btn-${id}" class="btn btn-primary" style="flex:1;" onclick="confirmAddDocEntry()">+ Adicionar Especialidade</button>
             </div>
 
             <!-- Lista de especialidades -->
