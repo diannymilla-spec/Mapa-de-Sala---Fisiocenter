@@ -61,6 +61,7 @@ let dashCustomStart = '';
 let dashCustomEnd = '';
 let dashGroupBy = 'week';
 let _dashDocFilter = '';
+let _dashSearchFocused = false;
 
 let curTgl = {
     tglPrefix:'Dr.',
@@ -2340,7 +2341,8 @@ function showToast(m){ const t=document.getElementById('toast'); t.textContent=m
 // ── DASHBOARD ──────────────────────────────────────────────────────
 function setDashRange(v) { dashRange = v; renderDashboard(); }
 function setDashGroup(v) { dashGroupBy = v; renderDashboard(); }
-function setDashDocFilter(v) { _dashDocFilter = v; renderDashboard(); }
+function _onDashDocSearch(val) { _dashDocFilter = val; _dashSearchFocused = true; renderDashboard(); }
+function clearDashDocFilter() { _dashDocFilter = ''; renderDashboard(); }
 
 function renderDashboard() {
     const el = document.getElementById('mainContent');
@@ -2370,7 +2372,15 @@ function renderDashboard() {
         return p[0] === S.currentUnit && p[2] >= startDate && p[2] <= endDate;
     });
     if (_dashDocFilter) {
-        entries = entries.filter(([,s]) => s.doctorId === _dashDocFilter);
+        const q = _dashDocFilter.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+        const matchIds = new Set(
+            (S.doctors||[]).filter(d => {
+                const name = d.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+                const spec = (d.spec||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+                return name.includes(q) || spec.includes(q);
+            }).map(d => d.id)
+        );
+        entries = entries.filter(([,s]) => s.doctorId && matchIds.has(s.doctorId));
     }
 
     // ── KPIs ──
@@ -2457,11 +2467,8 @@ function renderDashboard() {
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;white-space:nowrap;">Profissional:</span>
-            <select class="sel" style="padding:5px 8px;font-size:11px;min-width:180px;" onchange="setDashDocFilter(this.value)">
-              <option value="">Todos</option>
-              ${(S.doctors||[]).filter(d=>!d.archived).sort((a,b)=>a.name.localeCompare(b.name)).map(d=>`<option value="${d.id}" ${_dashDocFilter===d.id?'selected':''}>${d.name}</option>`).join('')}
-            </select>
-            ${_dashDocFilter ? `<button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="setDashDocFilter('')">✕ Limpar</button>` : ''}
+            <input id="dashDocSearch" class="inp" type="text" placeholder="Nome ou especialidade..." value="${_dashDocFilter}" oninput="_onDashDocSearch(this.value)" style="padding:5px 8px;font-size:11px;min-width:200px;">
+            ${_dashDocFilter ? `<button class="btn btn-ghost" style="padding:4px 8px;font-size:10px;" onclick="clearDashDocFilter()">✕</button>` : ''}
           </div>
         </div>
       </div>
@@ -2551,6 +2558,12 @@ function renderDashboard() {
       </div>
 
     </div>`;
+
+    if (_dashSearchFocused) {
+        _dashSearchFocused = false;
+        const si = document.getElementById('dashDocSearch');
+        if (si) { si.focus(); const l = si.value.length; si.setSelectionRange(l, l); }
+    }
 }
 
 init();
