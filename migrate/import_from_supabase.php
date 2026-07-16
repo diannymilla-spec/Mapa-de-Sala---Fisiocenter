@@ -14,7 +14,7 @@ if (php_sapi_name() !== 'cli') {
     die("Este script só roda via linha de comando (CLI), não é um endpoint web.\n");
 }
 
-require_once __DIR__ . '/../api/_db.php';
+require_once __DIR__ . '/../php-api/_db.php';
 
 $SUPABASE_URL = env_get('SUPABASE_URL');
 $SUPABASE_KEY = env_get('SUPABASE_KEY');

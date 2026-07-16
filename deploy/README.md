@@ -40,6 +40,21 @@ git clone <URL_DO_SEU_REPO> /var/www/mapa-de-sala
 # (ou: rsync/scp os arquivos direto, se preferir não usar git na VPS)
 ```
 
+O backend PHP mora em `php-api/` no repositório (não em `api/`) — foi movido pra lá
+de propósito pra não conflitar com as funções serverless antigas do Vercel
+(`api/verify-password.js`/`api/realclinic-sync.js`), que continuam servindo o site
+atual no Supabase enquanto essa migração não é finalizada. **Antes de ativar o Nginx
+(passo 6)**, na própria VPS:
+
+```bash
+cd /var/www/mapa-de-sala
+rm -f api/verify-password.js api/realclinic-sync.js   # não existem no PHP/VPS
+mv php-api/* api/
+rmdir php-api
+```
+
+Isso não afeta o repositório Git nem o deploy no Vercel — é só um ajuste local na VPS.
+
 ## 4. Configurar o `.env`
 
 Copie o `.env` que já existe na raiz do projeto e ajuste/adicione:
