@@ -122,18 +122,12 @@ async function saveConfig() {
 }
 
 // Upsert de um único slot → Supabase mapa_slots
+// Retorna true se a gravação foi confirmada pelo banco, false caso contrário.
 async function upsertSlot(key, slotData) {
-    const { error } = await _supabase.from('mapa_slots').upsert({
-        slot_key:  key,
-        doctor_id: slotData.doctorId || null,
-        status:    slotData.status,
-        nature:    slotData.nature  || null,
-        obs:       slotData.obs     || ''
-    });
-    if (error) { console.error('upsertSlot:', error); showToast('ERRO AO SALVAR SLOT'); }
+    return upsertSlots({ [key]: slotData });
 }
 
-// Upsert de múltiplos slots de uma vez
+// Upsert de múltiplos slots de uma vez. Retorna true se confirmado (ou nada a salvar).
 async function upsertSlots(slotsMap) {
     const rows = Object.entries(slotsMap).map(([key, data]) => ({
         slot_key:  key,
@@ -142,22 +136,23 @@ async function upsertSlots(slotsMap) {
         nature:    data.nature  || null,
         obs:       data.obs     || ''
     }));
-    if (!rows.length) return;
+    if (!rows.length) return true;
     const { error } = await _supabase.from('mapa_slots').upsert(rows);
-    if (error) { console.error('upsertSlots:', error); showToast('ERRO AO SALVAR SLOTS'); }
+    if (error) { console.error('upsertSlots:', error); showToast('ERRO AO SALVAR — TENTE NOVAMENTE'); return false; }
+    return true;
 }
 
-// Remove um único slot
+// Remove um único slot. Retorna true se confirmado.
 async function removeSlot(key) {
-    const { error } = await _supabase.from('mapa_slots').delete().eq('slot_key', key);
-    if (error) { console.error('removeSlot:', error); showToast('ERRO AO REMOVER SLOT'); }
+    return removeSlots([key]);
 }
 
-// Remove múltiplos slots de uma vez
+// Remove múltiplos slots de uma vez. Retorna true se confirmado (ou nada a remover).
 async function removeSlots(keys) {
-    if (!keys.length) return;
+    if (!keys.length) return true;
     const { error } = await _supabase.from('mapa_slots').delete().in('slot_key', keys);
-    if (error) { console.error('removeSlots:', error); showToast('ERRO AO REMOVER SLOTS'); }
+    if (error) { console.error('removeSlots:', error); showToast('ERRO AO REMOVER — TENTE NOVAMENTE'); return false; }
+    return true;
 }
 
 // ── REALCLINIC – SYNC ──────────────────────────────────────────────────────
@@ -855,7 +850,7 @@ function allowDrop(e) {
 function handleDragLeave(e) {
     e.currentTarget.classList.remove('drag-over');
 }
-function handleDrop(e, targetKey) {
+async function handleDrop(e, targetKey) {
     if(!isEditActive(S.currentUnit) || isMassMode) return;
     e.preventDefault();
     e.currentTarget.classList.remove('drag-over');
@@ -868,15 +863,19 @@ function handleDrop(e, targetKey) {
 
     const targetData = S.slots[targetKey];
 
-    if(targetData) S.slots[sourceKey] = targetData;
-    else delete S.slots[sourceKey];
+    const toUpsert = { [targetKey]: sourceData };
+    if (targetData) toUpsert[sourceKey] = targetData;
+    const ok = await upsertSlots(toUpsert);
+    if (!ok) return;
 
+    if (!targetData) {
+        const okDel = await removeSlot(sourceKey);
+        if (!okDel) return;
+        delete S.slots[sourceKey];
+    } else {
+        S.slots[sourceKey] = targetData;
+    }
     S.slots[targetKey] = sourceData;
-
-    // Persistir no Supabase
-    upsertSlot(targetKey, sourceData);
-    if(targetData) upsertSlot(sourceKey, targetData);
-    else removeSlot(sourceKey);
 
     renderMain(); showToast("HORÁRIO MOVIDO COM SUCESSO!");
 }
@@ -989,7 +988,7 @@ function toggleMassDiaInteiro(btn) {
     btn.classList.toggle('active', massDiaInteiro);
 }
 
-function applyMassClickToSlot(key) {
+async function applyMassClickToSlot(key) {
     const parts = key.split('|');
     const unitId = parts[0];
     const date = parts[2];
@@ -1028,23 +1027,29 @@ function applyMassClickToSlot(key) {
         const anyFilled = allKeys.some(k => S.slots[k]);
 
         if (anyFilled) {
+            const ok = await removeSlots(allKeys);
+            if (!ok) return;
             allKeys.forEach(k => { delete S.slots[k]; });
-            removeSlots(allKeys);
         } else {
             if (needsDoctor && !massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
             const toAdd = {};
-            allKeys.forEach(k => { S.slots[k] = buildSlot(k); toAdd[k] = S.slots[k]; });
-            upsertSlots(toAdd);
+            allKeys.forEach(k => { toAdd[k] = buildSlot(k); });
+            const ok = await upsertSlots(toAdd);
+            if (!ok) return;
+            Object.assign(S.slots, toAdd);
         }
     } else {
         const existing = S.slots[key];
         if (existing) {
+            const ok = await removeSlot(key);
+            if (!ok) return;
             delete S.slots[key];
-            removeSlot(key);
         } else {
             if (needsDoctor && !massDocId) { showToast("SELECIONE O MÉDICO NO MENU SUPERIOR!"); return; }
-            S.slots[key] = buildSlot(key);
-            upsertSlot(key, S.slots[key]);
+            const newSlot = buildSlot(key);
+            const ok = await upsertSlot(key, newSlot);
+            if (!ok) return;
+            S.slots[key] = newSlot;
         }
     }
 
@@ -1375,7 +1380,7 @@ function navigateToDate(date) {
     setView('week');
 }
 
-function saveAllocation() {
+async function saveAllocation() {
   const key    = document.getElementById('allocKey').value;
   const docId  = document.getElementById('allocDocId').value;
   const status = curTgl.tglAllocStatus;
@@ -1409,45 +1414,47 @@ function saveAllocation() {
   // Dia de SuS: marcador independente do status principal
   if (diaSuS) {
       const diasuSKey = `${parts[0]}|diasuS|${date}|dia`;
-      S.slots[diasuSKey] = { status: 'diasuS', doctorId: null };
-      toSave[diasuSKey] = S.slots[diasuSKey];
+      toSave[diasuSKey] = { status: 'diasuS', doctorId: null };
       _savedMsg = 'DIA MARCADO COMO DIA DE SUS';
   }
 
   if (status === 'feriado') {
       unit.rooms.filter(r => !r.archived && (!r.archivedFrom || date < r.archivedFrom)).forEach(room => {
           const k1 = `${unit.id}|${room.id}|${date}|${period}`;
-          S.slots[k1] = { status: 'feriado', doctorId: null };
-          toSave[k1] = S.slots[k1];
+          toSave[k1] = { status: 'feriado', doctorId: null };
           if (scope === 'diatodo') {
               const otherPeriod = period === 'manha' ? 'tarde' : 'manha';
               const k2 = `${unit.id}|${room.id}|${date}|${otherPeriod}`;
-              S.slots[k2] = { status: 'feriado', doctorId: null };
-              toSave[k2] = S.slots[k2];
+              toSave[k2] = { status: 'feriado', doctorId: null };
           }
       });
       _savedMsg = scope === 'diatodo' ? "DIA TODO MARCADO COMO FERIADO" : "TURNO MARCADO COMO FERIADO";
   } else if (status === 'manutencao') {
-      const applyM = (k) => { S.slots[k] = { status: 'manutencao', doctorId: null }; toSave[k] = S.slots[k]; };
+      const applyM = (k) => { toSave[k] = { status: 'manutencao', doctorId: null }; };
       applyM(key);
       if (scope === 'diatodo') applyM(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
       _savedMsg = scope === 'diatodo' ? "DIA TODO MARCADO COMO MANUTENÇÃO" : "TURNO MARCADO COMO MANUTENÇÃO";
   } else if (status === 'active' || status === 'canceled') {
       const apply = (k) => {
-          S.slots[k] = { doctorId: docId, status, nature, obs, entryId: allocSpecId || null };
-          toSave[k] = S.slots[k];
+          toSave[k] = { doctorId: docId, status, nature, obs, entryId: allocSpecId || null };
       };
       apply(key);
       if (scope === 'diatodo') apply(`${parts[0]}|${parts[1]}|${parts[2]}|${period === 'manha' ? 'tarde' : 'manha'}`);
       _savedMsg = _savedMsg || "ALOCAÇÃO SALVA!";
   }
 
-  upsertSlots(toSave);
+  const saveBtn = document.querySelector('#allocModal .btn-primary');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Salvando...'; }
+  const ok = await upsertSlots(toSave);
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Salvar'; }
+  if (!ok) return; // erro já exibido por upsertSlots; modal permanece aberto para nova tentativa
+
+  Object.assign(S.slots, toSave);
   closeAlloc(); renderMain();
   showToast(_savedMsg || 'SALVO!');
 }
 
-function deleteAllocation() {
+async function deleteAllocation() {
     const key    = document.getElementById('allocKey').value;
     const scope  = curTgl.tglAllocScope;
     const slot   = S.slots[key];
@@ -1459,35 +1466,38 @@ function deleteAllocation() {
 
     const unit = S.units.find(u => u.id === unitId);
     const keysToDelete = [];
+    let _msg = '';
 
     if (slot && slot.status === 'feriado') {
         unit.rooms.filter(r => !r.archived && (!r.archivedFrom || date < r.archivedFrom)).forEach(r => {
-            const k1 = `${unitId}|${r.id}|${date}|${period}`;
-            delete S.slots[k1]; keysToDelete.push(k1);
+            keysToDelete.push(`${unitId}|${r.id}|${date}|${period}`);
             if (scope === 'diatodo') {
                 const otherPeriod = period === 'manha' ? 'tarde' : 'manha';
-                const k2 = `${unitId}|${r.id}|${date}|${otherPeriod}`;
-                delete S.slots[k2]; keysToDelete.push(k2);
+                keysToDelete.push(`${unitId}|${r.id}|${date}|${otherPeriod}`);
             }
         });
-        showToast(scope === 'diatodo' ? "FERIADO REMOVIDO DO DIA TODO" : "FERIADO REMOVIDO DO TURNO");
+        _msg = scope === 'diatodo' ? "FERIADO REMOVIDO DO DIA TODO" : "FERIADO REMOVIDO DO TURNO";
     } else {
-        delete S.slots[key]; keysToDelete.push(key);
+        keysToDelete.push(key);
         if (scope === 'diatodo') {
             const otherPeriod = period === 'manha' ? 'tarde' : 'manha';
-            const k2 = `${unitId}|${roomId}|${date}|${otherPeriod}`;
-            delete S.slots[k2]; keysToDelete.push(k2);
+            keysToDelete.push(`${unitId}|${roomId}|${date}|${otherPeriod}`);
         }
-        showToast("ALOCAÇÃO REMOVIDA!");
+        _msg = "ALOCAÇÃO REMOVIDA!";
     }
 
     const diasuSDelKey = `${unitId}|diasuS|${date}|dia`;
-    if (S.slots[diasuSDelKey]) {
-        delete S.slots[diasuSDelKey];
-        keysToDelete.push(diasuSDelKey);
-    }
-    removeSlots(keysToDelete);
+    if (S.slots[diasuSDelKey]) keysToDelete.push(diasuSDelKey);
+
+    const delBtn = document.getElementById('btnDelAlloc');
+    if (delBtn) { delBtn.disabled = true; }
+    const ok = await removeSlots(keysToDelete);
+    if (delBtn) { delBtn.disabled = false; }
+    if (!ok) return; // erro já exibido por removeSlots; modal permanece aberto para nova tentativa
+
+    keysToDelete.forEach(k => { delete S.slots[k]; });
     closeAlloc(); renderMain();
+    showToast(_msg);
 }
 
 // CONFIGURAÇÕES E SEGURANÇA

@@ -1,4 +1,4 @@
-const CACHE = 'fisiocenter-v36';
+const CACHE = 'fisiocenter-v39';
 const ASSETS = ['/', '/index.html', '/style.css', '/script.js', '/mobile-styles.css', '/mobile-script.js'];
 
 self.addEventListener('install', e => {
@@ -15,6 +15,14 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  // Nunca cacheia chamadas de API — só assets estáticos. Dado dinâmico servido
+  // do cache em caso de falha de rede fazia a tela "voltar no tempo" após F5,
+  // mostrando alocações já apagadas/criadas como se ainda não tivessem sido
+  // salvas. A API agora é same-origin (antes era o Supabase, cross-origin),
+  // então checar só a origem não basta mais — precisa excluir o path /api/ também.
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {
