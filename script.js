@@ -552,21 +552,35 @@ async function init() {
             deduplicatePriceEntries();
         }
 
-        // 3. Carregar slots do Supabase
-        const { data: slotRows, error: slotErr } = await _supabase.from('mapa_slots').select('*');
-        if (!slotErr && slotRows) {
-            S.slots = {};
-            slotRows.forEach(row => {
-                if (row.slot_key) {
-                    S.slots[row.slot_key] = {
-                        doctorId: row.doctor_id,
-                        status:   row.status,
-                        nature:   row.nature,
-                        obs:      row.obs || ''
-                    };
-                }
-            });
+        // 3. Carregar slots do Supabase — paginado, porque a API REST do Supabase
+        // devolve no máximo 1000 linhas por chamada. A tabela já passou desse
+        // limite (1177+ linhas); um select('*') sem paginação trunca silenciosamente
+        // e faz slots recém-salvos "sumirem" no reload sem nenhum erro visível.
+        const slotRows = [];
+        const PAGE_SIZE = 1000;
+        let from = 0;
+        while (true) {
+            const { data: page, error: slotErr } = await _supabase
+                .from('mapa_slots')
+                .select('*')
+                .range(from, from + PAGE_SIZE - 1);
+            if (slotErr) { console.error('Erro ao carregar slots:', slotErr); break; }
+            if (!page || !page.length) break;
+            slotRows.push(...page);
+            if (page.length < PAGE_SIZE) break;
+            from += PAGE_SIZE;
         }
+        S.slots = {};
+        slotRows.forEach(row => {
+            if (row.slot_key) {
+                S.slots[row.slot_key] = {
+                    doctorId: row.doctor_id,
+                    status:   row.status,
+                    nature:   row.nature,
+                    obs:      row.obs || ''
+                };
+            }
+        });
     } catch(e) {
         console.error('Erro ao carregar dados do Supabase:', e);
     }
